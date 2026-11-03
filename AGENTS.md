@@ -12,6 +12,7 @@
 The user requires documentation to be maintained with every version update:
 
 1. Update `README.md` and `README.zh-CN.md` with the current version, implemented features, launch instructions and remaining limitations.
+   - The two README files must be complete, paragraph-by-paragraph translations with the same section order, paragraphs, lists, tables, code examples, screenshots and substantive links. Translate prose, captions and code comments; preserve executable commands, paths, identifiers and technical values. Keep language-switch links and translated heading anchors functional. Do not add content to only one language version.
 2. Add a dated version entry to `CHANGELOG.md`, newest first. Record actual additions, changes, fixes and relevant validation; do not invent completed work or test results.
 3. Keep the in-game version label and applicable development notes consistent with the release being prepared.
 4. Include these documentation changes in the same commit as the version update. Check relative documentation and screenshot links before publishing.

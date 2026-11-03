@@ -151,7 +151,7 @@ Edit or rename Unreal assets through the editor's Content Browser and fix redire
 
 ## Development notes
 
-Every version update must keep this README, the [Chinese README](README.zh-CN.md) and the [changelog](CHANGELOG.md) in sync. Project maintenance instructions are recorded in [AGENTS.md](AGENTS.md).
+Every version update must keep the [English README](README.md), [Chinese README](README.zh-CN.md) and [changelog](CHANGELOG.md) in sync. Project maintenance instructions are recorded in [AGENTS.md](AGENTS.md).
 
 Detailed notes are currently written in Chinese. Older entries describe historical versions; use the newest applicable entry for current behaviour.
 

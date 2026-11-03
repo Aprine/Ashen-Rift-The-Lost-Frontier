@@ -6,6 +6,7 @@ Version entries describe the implemented prototype and its recorded validation. 
 
 ### Documentation and repository preparation
 
+- Aligned the Chinese README with the English README as complete translations, including matching sections, tables, code examples, screenshots and links; recorded the bilingual parity requirement in `AGENTS.md`.
 - Added combat and camp screenshots with Chinese captions to `README.zh-CN.md`.
 - Added an English GitHub README and preserved the Chinese instructions as `README.zh-CN.md`.
 - Added repository screenshots under `Docs/Images` so they are available without the ignored `Saved` directory.
