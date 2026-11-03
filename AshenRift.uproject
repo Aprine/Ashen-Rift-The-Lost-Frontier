@@ -1,0 +1,13 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "4.27",
+  "Category": "Games",
+  "Description": "Ashen Rift - C++ and Blueprint prototype for UE 4.27.2",
+  "Modules": [ { "Name": "AshenRift", "Type": "Runtime", "LoadingPhase": "Default" } ],
+  "Plugins": [
+    { "Name": "OculusVR", "Enabled": false },
+    { "Name": "SteamVR", "Enabled": false },
+    { "Name": "PythonScriptPlugin", "Enabled": true, "TargetAllowList": ["Editor"] },
+    { "Name": "EditorScriptingUtilities", "Enabled": true, "TargetAllowList": ["Editor"] }
+  ]
+}
