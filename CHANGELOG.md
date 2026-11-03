@@ -9,6 +9,7 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added an English GitHub README and preserved the Chinese instructions as `README.zh-CN.md`.
 - Added repository screenshots under `Docs/Images` so they are available without the ignored `Saved` directory.
 - Added this changelog and project instructions requiring README and changelog updates for every version change.
+- Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
 ## 0.8 — 2026-11-03

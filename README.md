@@ -52,7 +52,14 @@ Python Script Plugin and Editor Scripting Utilities are enabled for editor asset
 
 ## Build and play
 
-Download or clone the project, then open PowerShell in the directory containing `AshenRift.uproject`. Set `$ueRoot` to your **Unreal Engine 4.27.2 installation directory**; the example uses the scripts' default path.
+Clone the project and open PowerShell in its root directory, which contains `AshenRift.uproject`:
+
+```powershell
+git clone https://github.com/Aprine/Ashen-Rift-The-Lost-Frontier.git
+cd Ashen-Rift-The-Lost-Frontier
+```
+
+Set `$ueRoot` to your **Unreal Engine 4.27.2 installation directory**; the example uses the scripts' default path.
 
 ```powershell
 $ueRoot = 'D:\Epic Games\UE_4.27'

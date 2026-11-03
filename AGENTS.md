@@ -3,6 +3,7 @@
 ## Scope
 
 - This directory is the Unreal Engine project and the GitHub repository root.
+- The canonical repository is `https://github.com/Aprine/Ashen-Rift-The-Lost-Frontier`; its default branch is `main`.
 - Keep the project on Unreal Engine 4.27.2 with C++ gameplay systems and Blueprint subclasses unless the user requests a migration.
 - Preserve source maps and binary assets. Rename or move Unreal assets through the editor rather than the filesystem.
 

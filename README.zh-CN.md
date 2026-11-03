@@ -2,6 +2,8 @@
 
 [版本更新日志](CHANGELOG.md)。每次版本更新须同步维护中英文 README 和更新日志，具体规则见 [AGENTS.md](AGENTS.md)。
 
+GitHub 仓库：[Aprine/Ashen-Rift-The-Lost-Frontier](https://github.com/Aprine/Ashen-Rift-The-Lost-Frontier)。克隆后从包含 `AshenRift.uproject` 的仓库根目录运行工具脚本；引擎路径须按本机安装位置设置。
+
 # Ashen Rift 失落边境
 
 UE **4.27.2** 单人第三人称 C++ + 蓝图项目。当前版本 **0.8：基础战斗动作与音效反馈**。已有中文可点击界面、两职业、三种非 Boss 敌人、技能、Boss、随机房间、装备、永久天赋和仓库，并加入实际骨骼动作、受击闪烁、伤害数字与原创音效。
