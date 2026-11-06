@@ -1,19 +1,30 @@
-param([string]$EngineRoot = 'D:\Epic Games\UE_4.27')
+param(
+    [string]$EngineRoot = 'D:\Epic Games\UE_4.27',
+    [ValidateSet('/Game/AshenRift/Maps/L_FrontierDungeon', '/Game/AshenRift/Maps/L_RandomDungeon')]
+    [string]$DungeonMap = '/Game/AshenRift/Maps/L_FrontierDungeon',
+    [ValidateSet('Core', 'Integration.RunLoop', 'Integration.Progression', 'Integration.RandomDungeon', 'Integration.Camp', 'Integration.EnemyVariants', 'Integration.UserInterface', 'Integration.CombatFeedback', 'Integration.TeamMap')]
+    [string[]]$Only = @()
+)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $editorFile = Join-Path $EngineRoot 'Engine\Binaries\Win64\UE4Editor-Cmd.exe'
 $projectFile = Join-Path $projectRoot 'AshenRift.uproject'
-foreach ($suite in @('Core', 'Integration.RunLoop', 'Integration.Progression', 'Integration.RandomDungeon', 'Integration.Camp', 'Integration.EnemyVariants', 'Integration.UserInterface', 'Integration.CombatFeedback')) {
-    $reportDir = Join-Path $projectRoot ('Saved\TestReport_' + $suite.Replace('.', '_'))
-    $logFile = Join-Path $projectRoot ('Saved\Test_' + $suite.Replace('.', '_') + '.log')
+$suites = @('Core', 'Integration.RunLoop', 'Integration.Progression', 'Integration.RandomDungeon', 'Integration.Camp', 'Integration.EnemyVariants', 'Integration.UserInterface', 'Integration.CombatFeedback')
+if ($DungeonMap -like '*/L_FrontierDungeon') { $suites += 'Integration.TeamMap' }
+if ($Only.Count -gt 0) {
+    foreach ($selectedSuite in $Only) { if ($selectedSuite -notin $suites) { throw "Suite $selectedSuite is not supported on $DungeonMap" } }
+    $suites = $Only
+}
+$mapName = Split-Path -Leaf $DungeonMap
+foreach ($suite in $suites) {
+    $reportDir = Join-Path $projectRoot ('Saved\TestReport_' + $mapName + '_' + $suite.Replace('.', '_'))
+    $logFile = Join-Path $projectRoot ('Saved\Test_' + $mapName + '_' + $suite.Replace('.', '_') + '.log')
     $testArgs = @($projectFile)
     if ($suite -eq 'Integration.RunLoop') { $testArgs += @('/Game/AshenRift/Maps/L_FirstPlayable', '-game', '-ARTestProfile') }
     if ($suite -eq 'Integration.Progression') { $testArgs += @('/Game/AshenRift/Maps/L_Progression', '-game', '-ARTestProfile') }
-    if ($suite -eq 'Integration.RandomDungeon') { $testArgs += @('/Game/AshenRift/Maps/L_RandomDungeon', '-game', '-ARTestProfile') }
-    if ($suite -eq 'Integration.Camp') { $testArgs += @('/Game/AshenRift/Maps/L_RandomDungeon', '-game', '-ARTestProfile') }
-    if ($suite -eq 'Integration.EnemyVariants') { $testArgs += @('/Game/AshenRift/Maps/L_RandomDungeon', '-game', '-ARTestProfile') }
-    if ($suite -eq 'Integration.UserInterface') { $testArgs += @('/Game/AshenRift/Maps/L_RandomDungeon', '-game', '-ARTestProfile') }
-    if ($suite -eq 'Integration.CombatFeedback') { $testArgs += @('/Game/AshenRift/Maps/L_RandomDungeon', '-game', '-ARTestProfile') }
+    if ($suite -in @('Integration.RandomDungeon', 'Integration.Camp', 'Integration.EnemyVariants', 'Integration.UserInterface', 'Integration.CombatFeedback', 'Integration.TeamMap')) {
+        $testArgs += @($DungeonMap, '-game', '-ARTestProfile')
+    }
     $testArgs += @('-unattended', '-nop4', '-nosplash', '-nullrhi', "-ExecCmds=Automation RunTests AshenRift.$suite", '-TestExit=Automation Test Queue Empty', "-ReportExportPath=$reportDir", '-stdout', '-FullStdOutLogOutput')
     $startedAt = Get-Date
     & $editorFile @testArgs 1> $logFile 2>&1

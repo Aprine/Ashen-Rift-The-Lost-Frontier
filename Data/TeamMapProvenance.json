@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-06",
+  "source_repository": "https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier",
+  "source_commit": "e2dfc0b83847e912f477b9bc0ecd9c0046c2f729",
+  "source_map": "Content/AshenRift/Maps/L_RandomDungeon.umap",
+  "integrated_map": "Content/AshenRift/Maps/L_FrontierDungeon.umap",
+  "kaykit_package_count": 215,
+  "unchanged_authored_prefabs": [
+    {
+      "path": "Content/AshenRift/Rooms/BP_Camp.uasset",
+      "sha256": "56C09FAA6DD2B222124B9D1D2B70D4EE12EC184BC37CA1837AAE301269A7ED28"
+    },
+    {
+      "path": "Content/AshenRift/Rooms/BP_Room_Barricade.uasset",
+      "sha256": "00D936DF5A4F2939B64933BBC1836A887A6C9FD97310E1E7E25F0F24400459A8"
+    },
+    {
+      "path": "Content/AshenRift/Rooms/BP_Room_Cross.uasset",
+      "sha256": "D632176B5A869A53D57DAEE6C1CCF90595A2C81A02A96BD366BE1D5F8AB8598C"
+    },
+    {
+      "path": "Content/AshenRift/Rooms/BP_Room_Pillars.uasset",
+      "sha256": "755DC32D00931FB9FB9AC3B634A80F80DD2AC8227846DD5851C5D7A6767DFFFD"
+    }
+  ],
+  "preserved_greybox_sha256": "972F4401F7E07254BA8EEFE09B4146E48C63A1FD134BFBE1ABB79F5A8084739A"
+}

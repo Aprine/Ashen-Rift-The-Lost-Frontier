@@ -243,6 +243,11 @@ void AARPlayerCharacter::ReturnOrRetry()
     if (State->Phase == EARRunPhase::Settling) { State->RetrySave(); return; }
     if (!State->ReturnToHub()) return;
     if (auto* Mode = Cast<AARPrototypeGameMode>(GetWorld()->GetAuthGameMode())) Mode->ClearRunActors();
+    for (TActorIterator<AARDungeonDirector> It(GetWorld()); It; ++It)
+    {
+        It->EnsureCampLayout();
+        break;
+    }
     ResetForHub();
 }
 void AARPlayerCharacter::ResetForHub()

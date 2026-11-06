@@ -2,6 +2,8 @@
 
 日期：2026-11-03。UE4.27.2，C++ 核心 + 蓝图，默认关卡保持 `/Game/AshenRift/Maps/L_RandomDungeon`。
 
+此页记录 0.8 历史版本。0.9 的默认关卡已改为 `L_FrontierDungeon`，新增环境与验证见 [地图整合记录](15_Team_Map_Integration.md)；战斗反馈逻辑继续使用本页实现。
+
 ## 游玩变化
 
 - 战士普攻、法师施法、旋风斩、敌人重击与受击都播放实际骨骼动作。

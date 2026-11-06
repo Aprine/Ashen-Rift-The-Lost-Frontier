@@ -114,10 +114,12 @@ public:
             P->SetActorLocation(FVector(7000, 0, 100));
             P->UseSkill();
             Test->TestTrue(TEXT("Closing inventory restores skill input"), P->SkillRemaining() > 5);
-            auto* Owner = World->SpawnActor<AARRangedEnemy>(AARRangedEnemy::StaticClass(), FVector(8000, 700, 100), FRotator::ZeroRotator);
+            // Keep the timing fixture in the open side of the supply room;
+            // the contributed counter and columns occupy the old +Y location.
+            auto* Owner = World->SpawnActor<AARRangedEnemy>(AARRangedEnemy::StaticClass(), FVector(8000, -200, 120), FRotator::ZeroRotator);
             if (!Owner) { Test->AddError(TEXT("Pause test caster failed to spawn.")); return true; }
             Owner->SetActorTickEnabled(false);
-            const FTransform Transform(FRotator::ZeroRotator, FVector(7400, 500, 115));
+            const FTransform Transform(FRotator::ZeroRotator, FVector(7400, -200, 115));
             Bolt = World->SpawnActorDeferred<AAREnemyBolt>(AAREnemyBolt::StaticClass(), Transform, Owner, Owner, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
             if (!Bolt.IsValid()) { Test->AddError(TEXT("Pause test projectile failed to spawn.")); return true; }
             UGameplayStatics::FinishSpawningActor(Bolt.Get(), Transform);

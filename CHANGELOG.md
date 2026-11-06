@@ -14,6 +14,33 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.9 — 2026-11-06
+
+### Added
+
+- Integrated Kuangxin's environment from source commit `e2dfc0b83847e912f477b9bc0ecd9c0046c2f729`: 215 KayKit asset packages, three editable combat-room Blueprints and a furnished camp Blueprint.
+- Added `L_FrontierDungeon` through UE4 Save Map As and made it the default play map; preserved the existing greybox and historical levels.
+- Connected authored room pools to seeded generation and reused the camp prefab across departures, extraction and death returns.
+- Added an isolated `Integration.TeamMap` regression for prefab dependencies, spawn/door clearance, all six layout orders, route connectivity and settlement.
+- Added source attribution, prefab preservation hashes, editing notes and current environment screenshots in both README languages.
+
+### Fixed
+
+- Replaced the camp exit's closed-door mesh with an open frame; provided arch clearance for existing navigation agents and rebuilt obsolete simple navigation collision.
+- Disabled blocking collision on the already-open decorative wooden door.
+- Removed editor-only Actor-label dependencies from runtime room display; empty or short layout pools retain three combat slots with legacy fallback geometry.
+- Protected hand-edited room and camp assets from starter-generator overwrites.
+- Moved the ranged-enemy test's dodge position away from new shop cover so it continues to exercise evasion rather than line-of-sight cancellation. Gameplay AI rules are unchanged.
+- Moved the UI pause test's temporary caster and projectile away from the contributed counter and columns.
+
+### Validation
+
+- Development Editor and Development Game builds passed; project Blueprint compilation reported zero errors, zero warnings and zero load failures.
+- The default regression configuration passed eleven tests; the preserved greybox configuration passed ten tests. The new map test also passed with real GPU rendering.
+- README structure, commands and relative documentation/image links passed checks; original greybox and all four hand-authored prefab hashes were preserved.
+
+Details are recorded in [map integration notes](Docs/15_Team_Map_Integration.md). Windows packaged-build acceptance remains pending.
+
 ## 0.8 — 2026-11-03
 
 ### Added

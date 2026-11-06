@@ -190,7 +190,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.8 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.9 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -369,8 +369,11 @@ FString UARGameWidget::LabelText(FName Key) const
         for (TActorIterator<AARDungeonDirector> It(GetWorld()); It; ++It)
             if (P->CanPlay() && It->RoomOrder.Num() == 3)
             {
-                auto Room = [](int32 Kind) { return Kind == 0 ? TEXT("石柱厅") : Kind == 1 ? TEXT("屏障厅") : TEXT("交错厅"); };
-                return FString::Printf(TEXT("种子 %d  /  %s → %s → 补给与撤离 → %s → 灰烬守望者"), S->Seed, Room(It->RoomOrder[0]), Room(It->RoomOrder[1]), Room(It->RoomOrder[2]));
+                auto Room = [&](int32 CombatSlot) -> FString {
+                    const FString Name = It->SlotDisplayName(CombatSlot);
+                    return Name == TEXT("Pillars") ? TEXT("石柱厅") : Name == TEXT("Barricade") ? TEXT("屏障厅") : Name == TEXT("Cross") ? TEXT("交错厅") : Name;
+                };
+                return FString::Printf(TEXT("种子 %d  /  %s → %s → 补给与撤离 → %s → 灰烬守望者"), S->Seed, *Room(0), *Room(1), *Room(2));
             }
         return TEXT("WASD 移动 · 鼠标观察 · 左键攻击 · 空格跳跃   /   成功撤离才会保存本局战利品");
     }

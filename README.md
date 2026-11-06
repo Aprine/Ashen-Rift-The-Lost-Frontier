@@ -4,11 +4,11 @@ English | [简体中文](README.zh-CN.md)
 
 A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and Blueprints**. Explore dungeons, collect loot, buy supplies, and choose between extracting safely or pushing deeper for greater rewards and permanent progression.
 
-**Version:** 0.8 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable greybox prototype
+**Version:** 0.9 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with an integrated environment
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
-![Warrior combat with an attack action and actual damage feedback](Docs/Images/combat.png)
+![Integrated dungeon with Kuangxin's editable barrier layout](Docs/Images/frontier-dungeon.png)
 
 ## The central decision
 
@@ -27,14 +27,15 @@ Camp preparation → Combat rooms → Supply room
 - **Two classes:** a melee Warrior with Whirlwind and a ranged Mage with mana-based spells and Arcane Burst.
 - **Three enemy types and one Boss:** Raiders, projectile-firing Hexers, heavy-attacking Sentinels and the Ashen Warden, with readable attack warnings and opportunities to dodge or use cover.
 - **Shuffled combat layouts:** Pillars, Barricade and Cross change order between runs. Fixed seeds reproduce layout order; the connected main route stays fixed.
+- **Teammate environment integration:** Kuangxin's KayKit dungeon map, three editable room Blueprints and a furnished camp are connected to the existing gameplay. The original greybox map remains available.
 - **Equipment and economy:** weapon, armour and charm slots, drops, potions, limited shop stock and temporary damage upgrades.
 - **Persistent progression:** shared Vitality and Might talents, item storage and camp loadout preparation.
 - **Clickable Chinese UI:** main menu, camp, inventory, trader, pause and settlement screens, with keyboard shortcuts retained.
 - **Combat feedback:** five basic skeletal overlay animations, hit flashes, sparks, actual damage numbers, light camera feedback and eleven originally synthesised sound effects.
 
-![Chinese camp interface showing permanent talents, stored items and loadout preparation](Docs/Images/camp.png)
+![Integrated camp with Kuangxin's furnished Blueprint layout](Docs/Images/frontier-camp.png)
 
-*Screenshots are from prototype validation. Displayed inventories and balances represent test profiles.*
+*Screenshots are from version 0.9 environment validation using an isolated test profile. Enemies were cleared for the dungeon navigation check.*
 
 ## Requirements
 
@@ -71,7 +72,7 @@ $ueRoot = 'D:\Epic Games\UE_4.27'
 .\Tools\PlayPrototype.ps1 -EngineRoot $ueRoot
 ```
 
-Alternatively, open `AshenRift.uproject` in UE 4.27.2 after building and press **Play**. The default map is `/Game/AshenRift/Maps/L_RandomDungeon`.
+Alternatively, open `AshenRift.uproject` in UE 4.27.2 after building and press **Play**. The default map is `/Game/AshenRift/Maps/L_FrontierDungeon`. The preserved version 0.8 greybox is `/Game/AshenRift/Maps/L_RandomDungeon`.
 
 Choose a class in the main menu, enter camp, prepare your equipment or purchase talents, then depart for the dungeon. Mouse buttons and keyboard shortcuts are both supported.
 
@@ -119,7 +120,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 
 ## Validation
 
-The recorded **3 November 2026** regression run passed **ten automated tests**: three core tests and seven integration tests. Coverage includes health, inventory, room seeds, the run loop, progression, the random dungeon, camp management, enemy variants, UI and combat feedback.
+On **6 November 2026**, the default regression configuration passed **eleven automated tests** (three core and eight integration tests); the preserved greybox configuration passed its ten-test suite. Coverage includes health, inventory, room seeds, the run loop, progression, dungeon navigation, camp management, enemy variants, UI, combat feedback and teammate-map integration.
 
 Run the existing suite after building the editor module:
 
@@ -128,6 +129,8 @@ Run the existing suite after building the editor module:
 ```
 
 The script checks fresh reports and assertion results. Integration tests use isolated save profiles. Logs and reports are generated under `Saved/`, which is excluded from version control.
+
+Version 0.9 adds `Integration.TeamMap` for authored prefab spawning, door clearance, all six layout permutations, camp reuse and extraction/death settlement. The default suite targets the integrated map; select the historical map with `-DungeonMap /Game/AshenRift/Maps/L_RandomDungeon`. Current integration results are recorded in the [map integration notes](Docs/15_Team_Map_Integration.md).
 
 Rendered checks and engine audio-output analysis are documented in the development notes. Player balance studies, performance benchmarks and packaged-build acceptance are still pending.
 
@@ -157,6 +160,9 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 | Topic | Documentation |
 |---|---|
+| Version 0.9 teammate environment integration | [Map integration](Docs/15_Team_Map_Integration.md) |
+| Editing room and camp Blueprints | [Room layouts](Docs/13_Editable_Room_Layouts.md) / [Camp layout](Docs/14_Camp_Room_Blueprint.md) |
+| Environment asset provenance and license | [Third-party assets](Docs/ThirdPartyAssets.md) |
 | Version 0.8 animations, effects and audio | [Combat feedback](Docs/12_Combat_Feedback.md) |
 | Version 0.7 UMG and input behaviour | [Chinese interface](Docs/11_Chinese_UMG.md) |
 | Version 0.6 ranged and elite enemies | [Enemy variants](Docs/10_Enemy_Variants.md) |
@@ -168,7 +174,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 ## Current limitations and next steps
 
-- Environments, characters and weapons still use greybox, template or simple placeholder visuals. Some scene signs remain in English.
+- The integrated environment uses KayKit assets and retains some greybox support geometry. Characters and weapons still use template or simple placeholder visuals. Some scene signs remain in English.
 - Layout order varies, but the main route has no procedural branches or maze topology.
 - Combat animations are basic generated overlays. Damage still uses existing gameplay timing rather than animation-driven hit events.
 - The stash has a fixed item list without item instances, random affixes, crafting or insurance.
@@ -183,6 +189,7 @@ The next stage focuses on playtesting preparation–spending–extraction decisi
 Developed as a **COMP 4900SEF Group 23** course project.
 
 - The starting character, movement animations and template dependencies come from Epic Games' Unreal Engine Third Person template.
+- [Kuangxin's contributed map](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/e2dfc0b83847e912f477b9bc0ecd9c0046c2f729) supplies the dungeon environment and editable room/camp layouts. KayKit environment assets are by [Kay Lousberg](https://kaylousberg.itch.io/kaykit-dungeon-pack), under CC0; see [asset provenance](Docs/ThirdPartyAssets.md).
 - The five basic combat overlay animations and eleven synthesised sound effects were generated for this project. Audio source files and the generation script are included.
 - Diablo, Path of Exile and Hades provided design inspiration.
 

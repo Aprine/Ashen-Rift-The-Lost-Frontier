@@ -8,5 +8,5 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectRoot 'Binaries\Win64\UE4Edit
     throw 'Build the editor module with Tools/BuildProject.ps1 first.'
 }
 # This is an interactive game window using the local UE4 installation.
-$previewArgs = '"{0}" /Game/AshenRift/Maps/L_RandomDungeon -game -windowed -ResX=1280 -ResY=720' -f $projectFile
+$previewArgs = '"{0}" /Game/AshenRift/Maps/L_FrontierDungeon -game -windowed -ResX=1280 -ResY=720' -f $projectFile
 Start-Process -FilePath $editorFile -ArgumentList $previewArgs

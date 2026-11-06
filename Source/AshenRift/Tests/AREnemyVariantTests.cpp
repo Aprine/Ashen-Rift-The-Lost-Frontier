@@ -113,7 +113,10 @@ public:
             Stage = 11;
             return false;
         case 11:
-            Player->SetActorLocation(FVector(7000, 450, 100));
+            // The contributed supply-room counter is on +Y. Dodge into the
+            // open side so this still tests evasion rather than cover cancelling
+            // the caster's line of sight before a projectile is released.
+            Player->SetActorLocation(FVector(7000, -450, 100));
             Deadline = Now + 1.9f;
             Stage = 2;
             return false;
