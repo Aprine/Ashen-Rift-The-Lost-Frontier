@@ -15,6 +15,10 @@ class ASHENRIFT_API UARRunGameInstance : public UGameInstance
     GENERATED_BODY()
 public:
     virtual void Init() override;
+    // Only session data crosses level travel; the profile format stays the same.
+    EARPlayerClass TravelClass = EARPlayerClass::Warrior;
+    FName PendingExpedition;
+    bool bHasDepartedTown = false;
     UPROPERTY(BlueprintReadOnly, Category="Run") EARRunPhase Phase = EARRunPhase::Hub;
     UPROPERTY(BlueprintReadOnly, Category="Run") int32 RunGold = 0;
     UPROPERTY(BlueprintReadOnly, Category="Run") int32 GoldEarned = 0;

@@ -16,6 +16,7 @@ class AARShop;
 class UAREquipmentComponent;
 class UARGameWidget;
 class UARCombatFeedbackComponent;
+class AARExpeditionSite;
 
 UCLASS()
 class ASHENRIFT_API AARPlayerCharacter : public ACharacter
@@ -157,13 +158,23 @@ class ASHENRIFT_API AARPrototypeGameMode : public AGameModeBase
     GENERATED_BODY()
 public:
     AARPrototypeGameMode();
+    virtual void StartPlay() override;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSubclassOf<AAREnemy> EnemyClass;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSubclassOf<AAREnemy> RangedEnemyClass;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSubclassOf<AAREnemy> EliteEnemyClass;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TSubclassOf<AARBoss> BossClass;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bUseNavigation = false;
     UFUNCTION(BlueprintCallable) bool StartDungeon(AARPlayerCharacter* Player);
+    bool DepartTown(AARPlayerCharacter* Player, int32 Destination);
+    bool IsExpeditionTown() const;
+    bool ReturnFromExpedition(AARPlayerCharacter* Player);
+    FVector CampLocation() const;
+    float CampYaw() const;
     UFUNCTION(BlueprintCallable) void ClearRunActors();
+private:
+    UPROPERTY() AARExpeditionSite* ExpeditionSite = nullptr;
+    void BeginAuthoredDungeon();
+    bool EnterDungeon(AARPlayerCharacter* Player);
 };
 
 UCLASS()

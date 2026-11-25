@@ -1,4 +1,4 @@
-param([string]$EngineRoot = 'D:\Epic Games\UE_4.27')
+param([string]$EngineRoot = 'D:\Epic Games\UE_4.27', [switch]$Classic)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $editorFile = Join-Path $EngineRoot 'Engine\Binaries\Win64\UE4Editor.exe'
@@ -8,5 +8,6 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectRoot 'Binaries\Win64\UE4Edit
     throw 'Build the editor module with Tools/BuildProject.ps1 first.'
 }
 # This is an interactive game window using the local UE4 installation.
-$previewArgs = '"{0}" /Game/AshenRift/Maps/L_FrontierDungeon -game -windowed -ResX=1280 -ResY=720' -f $projectFile
+$map = if ($Classic) { '/Game/AshenRift/Maps/L_FrontierDungeon' } else { '/Game/AshenRift/Maps/Map_Hub' }
+$previewArgs = '"{0}" {1} -game -windowed -ResX=1280 -ResY=720' -f $projectFile, $map
 Start-Process -FilePath $editorFile -ArgumentList $previewArgs

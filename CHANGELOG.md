@@ -14,6 +14,26 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.10 — 2026-11-25
+
+### Added
+
+- Integrated Kuangxin's `Map_Hub`, `Map_Dungeon1` and `Map_Dungeon2` with their environment packages. Town is the new startup map. Both dungeons have selectable departures, encounters, a Boss, trading, loot and timed extraction.
+- Preserve the selected class through travel and debit prepared equipment when the destination pawn is ready. The result screen returns the player to town after extraction or death.
+- Added `Integration.Expeditions` for both departures and the cross-map run loop. `PlayPrototype.ps1 -Classic` starts the earlier shuffled route.
+
+### Fixed
+
+- Rebound the new maps to Ashen Rift gameplay and made authored doorway openings and floor seams traversable by player and navigation agents.
+- Added fill lights for character and room readability, and kept enemy labels from overlapping the HUD and other enemy labels.
+- Replaced the English and Chinese README previews with actual in-game captures of the town and both new dungeons, stored under `Docs/Images` with matching relative links.
+
+### Validation
+
+- Passed the 12-test default regression suite, the rendered expedition flow, Development Editor and Game builds, project Blueprint compilation, and a WindowsNoEditor cook of all three new maps.
+
+See the [town and expedition integration notes](Docs/16_Town_Expeditions.md) for the contribution sources and validation.
+
 ## 0.9 — 2026-11-06
 
 ### Added

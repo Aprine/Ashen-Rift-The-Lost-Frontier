@@ -4,38 +4,40 @@
 
 一款使用 **Unreal Engine 4.27.2、C++ 和蓝图**开发的单人动作 RPG 原型。探索地牢、收集战利品、购买补给，并在安全撤离与继续深入、争取更多奖励和永久成长之间作出选择。
 
-**版本：**0.9 · **平台：**Windows · **界面语言：**中文 · **开发状态：**已整合环境的可玩原型
+**版本：**0.10 · **平台：**Windows · **界面语言：**中文 · **开发状态：**包含主城和两张地牢的可玩原型
 
 [更新日志](CHANGELOG.md) · [开发记录](#开发记录)
 
-![整合后的地牢，展示 Kuangxin 的可编辑屏障布局](Docs/Images/frontier-dungeon.png)
+![出发前站在 Kuangxin 制作的主城里的玩家](Docs/Images/expedition-town.png)
 
 ## 核心决策
 
-每一局都需要决定愿意承担多大风险。使用本局金币购买药水和临时伤害强化，可以提高应对后续敌人的能力，但也会减少能够撤离带出的金币。在补给房，你可以保住已有战利品，也可以继续挑战精英敌人和灰烬守望者，争取额外的金币与符文。
+每一局都需要决定愿意承担多大风险。从主城选择一张地牢。使用本局金币购买药水和临时伤害强化，可以提高应对后续敌人的能力，但也会减少能够撤离带出的金币。你可以回到撤离传送阵保存战利品，也可以继续挑战精英和灰烬守望者，争取更多奖励。
 
 成功撤离会保存剩余物品和货币。符文用于购买永久天赋，已存入仓库的装备可以在后续副本中携带。更好的装备有助于战斗，但在撤离前死亡也会失去这些装备。未携带的仓库物品、已存货币和已购买的天赋会保留。
 
 ```text
-营地准备 → 战斗房间 → 补给房
-                       ├─ 撤离 → 保存战利品 → 返回营地
-                       └─ 继续 → 精英与 Boss → 返回撤离点
+主城准备 → 选择地牢一或地牢二 → 探索并收集战利品
+                                  ├─ 撤离 → 保存战利品 → 返回主城
+                                  └─ 继续 → 精英与 Boss → 返回撤离点
 ```
 
 ## 功能特色
 
 - **两种职业：**拥有旋风斩的近战战士，以及使用法力施放法术和奥术爆发的远程法师。
 - **三种敌人及一名 Boss：**掠夺者、发射弹体的术士、使用重击的精英守卫，以及灰烬守望者；攻击具有清晰预警，玩家可以闪避或利用掩体应对。
-- **随机排列的战斗布局：**Pillars、Barricade 和 Cross 在不同副本中的顺序会变化。固定种子可复现布局顺序，连通的主路线保持固定。
-- **组员环境整合：**Kuangxin 制作的 KayKit 地牢地图、三个可编辑房间蓝图和带有摆设的营地已接入现有玩法。原灰盒地图仍然保留。
+- **主城和两张地牢：**Kuangxin 手工制作的主城和两张地牢接入了现有职业、仓库、商店、敌人、Boss 和撤离系统。玩家在准备面板选择地牢，结算后返回主城。
+- **经典随机布局：**经典模式仍可游玩之前的 `L_FrontierDungeon`。三个可编辑的战斗房间蓝图 Pillars、Barricade 和 Cross 仍按种子改变顺序。
 - **装备与经济系统：**武器、护甲和饰品槽位，以及物品掉落、药水、有限商店库存和临时伤害强化。
 - **跨局成长：**两职业共享的生命与攻击天赋、物品仓库和营地携装准备。
 - **可点击的中文界面：**主菜单、营地、背包、商店、暂停和结算界面，同时保留键盘快捷键。
 - **战斗反馈：**五段基础骨骼叠加动画、受击闪烁、火花、实际伤害数字、轻微镜头反馈，以及十一个原创合成音效。
 
-![整合后的营地，展示 Kuangxin 带有摆设的蓝图布局](Docs/Images/frontier-camp.png)
+![地牢一的石质走廊和点灯的壁龛](Docs/Images/expedition-dungeon-1.png)
 
-*截图取自使用独立测试存档的 0.9 版环境验证。地牢导航检查时已清除敌人。*
+![地牢二中不同的房间布局](Docs/Images/expedition-dungeon-2.png)
+
+*截图取自 0.10 版游戏内，使用独立测试存档。*
 
 ## 环境要求
 
@@ -72,9 +74,9 @@ $ueRoot = 'D:\Epic Games\UE_4.27'
 .\Tools\PlayPrototype.ps1 -EngineRoot $ueRoot
 ```
 
-也可以在构建完成后，使用 UE 4.27.2 打开 `AshenRift.uproject` 并点击 **Play**。默认地图为 `/Game/AshenRift/Maps/L_FrontierDungeon`。保留的 0.8 版灰盒地图为 `/Game/AshenRift/Maps/L_RandomDungeon`。
+默认地图为 `/Game/AshenRift/Maps/Map_Hub`。可以在 UE 4.27.2 中打开项目编辑地图，或使用上面的独立试玩脚本体验跨地图流程。试玩脚本加上 `-Classic` 可启动 `/Game/AshenRift/Maps/L_FrontierDungeon`。早期灰盒地图仍可从 `/Game/AshenRift/Maps/L_RandomDungeon` 打开。
 
-在主菜单选择职业，进入营地，准备装备或购买天赋，然后出发进入地牢。鼠标按钮和键盘快捷键均可使用。
+在主菜单选择职业，进入主城，准备装备或购买天赋，然后在准备面板点击 **地牢一** 或 **地牢二**。按 **E** 前往地牢一。结算时按 **R** 返回主城。
 
 编译 Development 游戏目标：
 
@@ -93,7 +95,8 @@ $ueRoot = 'D:\Epic Games\UE_4.27'
 | 普通攻击／法师弹体 | 鼠标左键 |
 | 职业技能 | F |
 | 使用药水 | Q |
-| 交互、交易、出发或撤离 | E |
+| 交互、交易、前往地牢一或撤离 | E |
+| 前往地牢二 | 主城准备面板中的地牢二按钮 |
 | 打开背包 | Tab |
 | 装卸武器／护甲／饰品 | Z／X／C |
 | 打开营地准备 | 营地附近按 B |
@@ -120,7 +123,7 @@ $ueRoot = 'D:\Epic Games\UE_4.27'
 
 ## 验证情况
 
-**2026 年 11 月 6 日**，默认回归配置通过了**十一项自动化测试**（三项核心测试和八项集成测试）；保留的灰盒配置通过了其十项测试套件。覆盖生命值、背包、房间种子、副本循环、成长系统、地牢导航、营地管理、敌人变种、界面、战斗反馈和组员地图整合。
+测试覆盖生命值、背包、房间种子、副本循环、成长系统、地牢导航、营地管理、敌人变种、界面、战斗反馈，以及从主城进入两张地牢的跨地图流程。最近的测试结果见 [0.10 整合说明](Docs/16_Town_Expeditions.md)。
 
 编译编辑器模块后，运行现有测试套件：
 
@@ -130,7 +133,7 @@ $ueRoot = 'D:\Epic Games\UE_4.27'
 
 脚本会检查新生成的报告及断言结果。集成测试使用独立存档。日志和报告生成在 `Saved/` 中，该目录不纳入版本控制。
 
-0.9 版新增 `Integration.TeamMap`，验证手工编辑的预制体生成、门洞净空、全部六种布局排列、营地复用和撤离／死亡结算。默认套件针对整合地图运行；使用 `-DungeonMap /Game/AshenRift/Maps/L_RandomDungeon` 可选择历史地图。本次整合的验证结果记录在[地图整合说明](Docs/15_Team_Map_Integration.md)中。
+使用 `-Only Integration.Expeditions` 可单独运行主城和跨地图流程回归。使用 `-DungeonMap /Game/AshenRift/Maps/L_RandomDungeon` 可运行历史地图测试套件。
 
 渲染检查和引擎音频输出分析记录在开发文档中。玩家平衡性研究、性能基准测试和打包版本验收仍待完成。
 
@@ -160,6 +163,7 @@ Docs/Images/         本 README 使用的截图
 
 | 主题 | 文档 |
 |---|---|
+| 0.10 版主城、两张地牢与新截图 | [主城与地牢](Docs/16_Town_Expeditions.md) |
 | 0.9 版组员环境整合 | [地图整合](Docs/15_Team_Map_Integration.md) |
 | 编辑房间与营地蓝图 | [房间布局](Docs/13_Editable_Room_Layouts.md)／[营地布局](Docs/14_Camp_Room_Blueprint.md) |
 | 环境资产来源与许可证 | [第三方资产](Docs/ThirdPartyAssets.md) |
@@ -175,7 +179,7 @@ Docs/Images/         本 README 使用的截图
 ## 当前限制与下一步计划
 
 - 整合环境使用 KayKit 资产，并保留部分灰盒支撑几何体。角色和武器仍使用模板或简易占位外观。部分场景标牌仍为英文。
-- 布局顺序会变化，但主路线没有随机分支或迷宫拓扑。
+- 两张新地牢使用手工制作的固定路线。经典地牢会在固定路线内随机排列战斗房间布局。
 - 战斗动画为基础生成的叠加动画。伤害仍使用现有玩法时序，而非动画驱动的命中事件。
 - 仓库使用固定物品列表，没有独立物品实例、随机词缀、合成或保险。
 - 音效设置目前提供本次运行内有效的开关。背景音乐、音量滑块和最终混音仍待制作。
@@ -189,7 +193,7 @@ Docs/Images/         本 README 使用的截图
 本项目为 **COMP 4900SEF 第 23 组**课程项目。
 
 - 初始角色、移动动画和模板依赖来自 Epic Games 的 Unreal Engine 第三人称模板。
-- [Kuangxin 提交的地图](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/e2dfc0b83847e912f477b9bc0ecd9c0046c2f729)提供地牢环境及可编辑房间／营地布局。KayKit 环境资产由 [Kay Lousberg](https://kaylousberg.itch.io/kaykit-dungeon-pack) 制作，采用 CC0；详见[资产来源](Docs/ThirdPartyAssets.md)。
+- Kuangxin 贡献了[主城](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/504548eab670760d630f93ac4df2280e31786df3)、[两张地牢](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/28409168f8af23470a03b9a3b0da41e12dc404e6)和[经典房间与营地布局](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/e2dfc0b83847e912f477b9bc0ecd9c0046c2f729)。[资产来源](Docs/ThirdPartyAssets.md)标注了 Kay Lousberg 制作的 KayKit 素材包，以及随地图交付的地面材质。
 - 五段基础战斗叠加动画和十一个合成音效为本项目生成。仓库包含音频源文件和生成脚本。
 - Diablo、Path of Exile 和 Hades 提供了设计灵感。
 

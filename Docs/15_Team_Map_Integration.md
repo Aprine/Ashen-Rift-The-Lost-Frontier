@@ -2,6 +2,8 @@
 
 日期：2026-11-06（Asia/Shanghai）。引擎保持 Unreal Engine 4.27.2，采用 C++ 核心与蓝图布局。
 
+此页记录经典地图 `L_FrontierDungeon` 的整合历史。0.10 的默认入口和新地牢见 [主城与双地牢](16_Town_Expeditions.md)。
+
 ## 来源与保留范围
 
 - 组员：Kuangxin。

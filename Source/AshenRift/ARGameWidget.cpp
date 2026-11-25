@@ -36,6 +36,11 @@
 
 namespace
 {
+    const FVector2D HudDesignSize(1280, 720);
+    const FSlateRect StatusBounds(22, 20, 396, 225);
+    const FSlateRect PromptBounds(22, 570, 742, 658);
+    const FSlateRect FooterBounds(22, 668, 1258, 708);
+    const FSlateRect BossBounds(440, 22, 1040, 98);
     const FLinearColor Gold(.86f, .67f, .36f);
     const FLinearColor Muted(.63f, .69f, .75f);
     const FLinearColor Cyan(.36f, .76f, .86f);
@@ -111,12 +116,12 @@ void UARGameWidget::BuildRoot()
     Scale->SetStretch(EStretch::ScaleToFit);
     WidgetTree->RootWidget = Scale;
     auto* Design = WidgetTree->ConstructWidget<USizeBox>();
-    Design->SetWidthOverride(1280); Design->SetHeightOverride(720);
+    Design->SetWidthOverride(HudDesignSize.X); Design->SetHeightOverride(HudDesignSize.Y);
     Scale->AddChild(Design);
     RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>();
     RootCanvas->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
     Design->AddChild(RootCanvas);
-    StatusPanel = Panel(RootCanvas, FVector2D(22, 20), FVector2D(374, 205), Ink);
+    StatusPanel = Panel(RootCanvas, StatusBounds.GetTopLeft(), StatusBounds.GetSize(), Ink);
     auto* Stats = WidgetTree->ConstructWidget<UVerticalBox>(); StatusPanel->AddChild(Stats);
     Text(Stats, TEXT("ASHEN RIFT  /  失落边境"), 17, Gold);
     Text(Stats, TEXT(""), 16, FLinearColor::White, TEXT("HudHealth"));
@@ -128,13 +133,13 @@ void UARGameWidget::BuildRoot()
     auto* ManaSize = WidgetTree->ConstructWidget<USizeBox>(); ManaSize->SetHeightOverride(5); ManaSize->AddChild(ManaBar); Stats->AddChild(ManaSize);
     Text(Stats, TEXT(""), 14, FLinearColor::White, TEXT("HudWallet"));
     Text(Stats, TEXT(""), 13, Muted, TEXT("HudSkill"));
-    PromptPanel = Panel(RootCanvas, FVector2D(22, 570), FVector2D(720, 88), FLinearColor(.018f, .027f, .041f, .82f));
+    PromptPanel = Panel(RootCanvas, PromptBounds.GetTopLeft(), PromptBounds.GetSize(), FLinearColor(.018f, .027f, .041f, .82f));
     auto* PromptBody = WidgetTree->ConstructWidget<UVerticalBox>(); PromptPanel->AddChild(PromptBody);
     Text(PromptBody, TEXT(""), 15, Gold, TEXT("HudNotice"));
     Text(PromptBody, TEXT(""), 14, Cyan, TEXT("HudContext"));
-    FooterPanel = Panel(RootCanvas, FVector2D(22, 668), FVector2D(1236, 40), Ink); FooterPanel->SetPadding(FMargin(10, 5));
+    FooterPanel = Panel(RootCanvas, FooterBounds.GetTopLeft(), FooterBounds.GetSize(), Ink); FooterPanel->SetPadding(FMargin(10, 5));
     Text(FooterPanel, TEXT(""), 12, Muted, TEXT("HudRoute"));
-    BossPanel = Panel(RootCanvas, FVector2D(440, 22), FVector2D(600, 76), Ink);
+    BossPanel = Panel(RootCanvas, BossBounds.GetTopLeft(), BossBounds.GetSize(), Ink);
     auto* BossBody = WidgetTree->ConstructWidget<UVerticalBox>(); BossPanel->AddChild(BossBody);
     Text(BossBody, TEXT(""), 17, Gold, TEXT("HudBoss"));
     BossBar = WidgetTree->ConstructWidget<UProgressBar>(); BossBar->SetFillColorAndOpacity(FLinearColor(.7f, .09f, .13f));
@@ -190,7 +195,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.9 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.10 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -226,7 +231,14 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Text(Right, TEXT(""), 13, Gold, TEXT("ModalNotice"));
         Gap(ModalBody, 12);
         auto* Footer = WidgetTree->ConstructWidget<UHorizontalBox>(); ModalBody->AddChild(Footer);
-        Button(Footer, TEXT("关闭准备 [B]"), TEXT("Close")); Button(Footer, TEXT("携带所选物品出发 [E]"), TEXT("Deploy"));
+        Button(Footer, TEXT("关闭准备 [B]"), TEXT("Close"));
+        const auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>();
+        if (Mode && Mode->IsExpeditionTown())
+        {
+            Button(Footer, TEXT("前往地牢一 [E]"), TEXT("Deploy"));
+            Button(Footer, TEXT("前往地牢二"), TEXT("DeploySecond"));
+        }
+        else Button(Footer, TEXT("携带所选物品出发 [E]"), TEXT("Deploy"));
     }
     else if (Screen == EARUIScreen::Inventory)
     {
@@ -420,8 +432,12 @@ bool UARGameWidget::ExecuteAction(FName Action, int32 Payload)
     { bMainMenu = false; P->bCampOpen = true; Done = true; }
     else if ((Action == TEXT("Warrior") || Action == TEXT("Mage")) && (View == EARUIScreen::MainMenu || View == EARUIScreen::Camp))
         Done = P->SelectClass(Action == TEXT("Mage") ? EARPlayerClass::Mage : EARPlayerClass::Warrior);
-    else if (Action == TEXT("Deploy") && View == EARUIScreen::Camp)
-    { P->Interact(); Done = S->Phase == EARRunPhase::InDungeon; }
+    else if ((Action == TEXT("Deploy") || Action == TEXT("DeploySecond")) && View == EARUIScreen::Camp)
+    {
+        auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>();
+        if (Mode && Mode->IsExpeditionTown()) Done = Mode->DepartTown(P, Action == TEXT("DeploySecond") ? 1 : 0);
+        else if (Action == TEXT("Deploy")) { P->Interact(); Done = S->Phase == EARRunPhase::InDungeon; }
+    }
     else if ((Action == TEXT("PreparePlus") || Action == TEXT("PrepareMinus")) && View == EARUIScreen::Camp && Payload >= 0 && Payload < 5)
     {
         P->CampRow = Payload;
@@ -521,18 +537,43 @@ int32 UARGameWidget::NativePaint(const FPaintArgs& Args, const FGeometry& Geomet
     const float Scale = FMath::Max(.01f, UWidgetLayoutLibrary::GetViewportScale(GetWorld()));
     const FSlateBrush* White = FCoreStyle::Get().GetBrush("WhiteBrush");
     const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Regular", FMath::RoundToInt(13.f / Scale));
-    for (TActorIterator<AAREnemy> It(GetWorld()); It; ++It)
+    // World projection uses viewport pixels. Map the fixed HUD design into
+    // that same space, including the outer ScaleBox's letterboxing.
+    int32 Width = 0, Height = 0;
+    GetOwningPlayer()->GetViewportSize(Width, Height);
+    const FVector2D Viewport(Width, Height);
+    const float Fit = FMath::Min(Viewport.X / HudDesignSize.X, Viewport.Y / HudDesignSize.Y);
+    const FVector2D HudOrigin = (Viewport - HudDesignSize * Fit) * .5f;
+    TArray<FSlateRect> Occupied;
+    const FSlateRect Panels[] = { StatusBounds, PromptBounds, FooterBounds, BossBounds };
+    for (const FSlateRect& Bounds : Panels)
     {
-        if (Cast<AARBoss>(*It) || FVector::Dist(P->GetActorLocation(), It->GetActorLocation()) > 1800) continue;
+        const FVector2D Min = HudOrigin + Bounds.GetTopLeft() * Fit;
+        const FVector2D Max = Min + Bounds.GetSize() * Fit;
+        Occupied.Emplace(Min.X, Min.Y, Max.X, Max.Y);
+    }
+    TArray<AAREnemy*> Nearby;
+    for (TActorIterator<AAREnemy> It(GetWorld()); It; ++It)
+        if (!Cast<AARBoss>(*It) && !It->Health->bDead && FVector::DistSquared(P->GetActorLocation(), It->GetActorLocation()) <= FMath::Square(1800.f))
+            Nearby.Add(*It);
+    const FVector PlayerLocation = P->GetActorLocation();
+    Nearby.Sort([&](const AAREnemy& A, const AAREnemy& B)
+    { return FVector::DistSquared(PlayerLocation, A.GetActorLocation()) < FVector::DistSquared(PlayerLocation, B.GetActorLocation()); });
+    for (const auto* Enemy : Nearby)
+    {
         FVector2D Screen;
-        if (!GetOwningPlayer()->ProjectWorldLocationToScreen(It->GetActorLocation() + FVector(0, 0, 125), Screen, true)) continue;
+        if (!GetOwningPlayer()->ProjectWorldLocationToScreen(Enemy->GetActorLocation() + FVector(0, 0, 125), Screen, true)) continue;
+        const float Right = Enemy->bWindingAttack ? 90.f : 40.f;
+        const FSlateRect Bounds(Screen.X - 40.f, Screen.Y - 23.f, Screen.X + Right, Screen.Y + 6.f);
+        if (Occupied.ContainsByPredicate([&](const FSlateRect& Area) { return FSlateRect::DoRectanglesIntersect(Area, Bounds); })) continue;
+        Occupied.Add(Bounds);
         Screen /= Scale;
-        const FString Name = Cast<AARRangedEnemy>(*It) ? TEXT("术士") : Cast<AAREliteEnemy>(*It) ? TEXT("精英守卫") : TEXT("掠夺者");
+        const FString Name = Cast<AARRangedEnemy>(Enemy) ? TEXT("术士") : Cast<AAREliteEnemy>(Enemy) ? TEXT("精英守卫") : TEXT("掠夺者");
         FSlateDrawElement::MakeText(Elements, Layer, Geometry.ToPaintGeometry(Screen + FVector2D(-40, -23) / Scale, FVector2D(180, 24) / Scale),
-            FText::FromString(Name + (It->bWindingAttack ? TEXT(" · 蓄势") : TEXT(""))), Font, ESlateDrawEffect::None, It->bWindingAttack ? Gold : FLinearColor::White);
+            FText::FromString(Name + (Enemy->bWindingAttack ? TEXT(" · 蓄势") : TEXT(""))), Font, ESlateDrawEffect::None, Enemy->bWindingAttack ? Gold : FLinearColor::White);
         FSlateDrawElement::MakeBox(Elements, Layer, Geometry.ToPaintGeometry(Screen + FVector2D(-40, 0) / Scale, FVector2D(80, 6) / Scale), White, ESlateDrawEffect::None, FLinearColor(.12f, .03f, .03f));
-        FSlateDrawElement::MakeBox(Elements, Layer + 1, Geometry.ToPaintGeometry(Screen + FVector2D(-40, 0) / Scale, FVector2D(80 * It->Health->CurrentHealth / It->Health->MaxHealth, 6) / Scale), White,
-            ESlateDrawEffect::None, It->bWindingAttack ? Gold : FLinearColor(.78f, .12f, .1f));
+        FSlateDrawElement::MakeBox(Elements, Layer + 1, Geometry.ToPaintGeometry(Screen + FVector2D(-40, 0) / Scale, FVector2D(80 * Enemy->Health->CurrentHealth / Enemy->Health->MaxHealth, 6) / Scale), White,
+            ESlateDrawEffect::None, Enemy->bWindingAttack ? Gold : FLinearColor(.78f, .12f, .1f));
     }
     return Layer + 1;
 }
@@ -544,6 +585,8 @@ FString UARGameWidget::TranslateNotice(const FString& Message)
         {TEXT("Not enough mana"), TEXT("法力不足。")},
         {TEXT("Potion: restored health"), TEXT("已使用药水，恢复生命。")},
         {TEXT("Return to the camp to enter the dungeon"), TEXT("请回到营地附近再出发。")},
+        {TEXT("Dungeon map is unavailable"), TEXT("无法加载所选地牢。")},
+        {TEXT("Could not start the dungeon run"), TEXT("未能开始本局，请在主城重试。")},
         {TEXT("Extracting: stay inside the portal for 3 seconds"), TEXT("正在撤离：请在传送阵内停留 3 秒。")},
         {TEXT("Press E near the trader or inside the blue extraction portal"), TEXT("在商人旁或蓝色撤离阵内按 E。")},
         {TEXT("Extraction cancelled"), TEXT("撤离已中断。")},

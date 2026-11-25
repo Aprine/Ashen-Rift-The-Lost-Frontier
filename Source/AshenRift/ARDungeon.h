@@ -147,6 +147,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="AshenRift|Editor")
     static bool ResizeNavigationBounds(AActor* Actor, FVector Center, FVector Extent);
 
+    UFUNCTION(BlueprintCallable, Category="AshenRift|Editor")
+    static bool ClearInheritedMapLighting(UObject* WorldContext);
+
     /**
      * Creates a normal Actor Blueprint (parent = AActor) with SCS StaticMesh components
      * for the given layout kind: 0=Pillars, 1=Barricade, 2=Cross.

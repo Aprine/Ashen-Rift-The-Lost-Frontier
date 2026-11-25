@@ -67,8 +67,9 @@ float AARPlayerCharacter::BaseMaxHealth() const
 bool AARPlayerCharacter::IsAtCamp() const
 {
     auto* State = Cast<UARRunGameInstance>(GetGameInstance());
+    const auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>();
     return State && State->Phase == EARRunPhase::Hub && !Health->bDead &&
-        FVector::Dist(GetActorLocation(), FVector(-700, 0, 100)) <= 650;
+        FVector::Dist(GetActorLocation(), Mode ? Mode->CampLocation() : FVector(-700, 0, 100)) <= 650;
 }
 FName AARPlayerCharacter::CampItem(int32 Row)
 {

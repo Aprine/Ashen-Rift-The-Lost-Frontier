@@ -1,5 +1,6 @@
 ﻿#include "ARPrototype.h"
 #include "ARGameWidget.h"
+#include "ARRunGameInstance.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
@@ -14,7 +15,8 @@ void AARPrototypeHUD::BeginPlay()
         if (GameUI)
         {
             // Gameplay regressions skip the initial menu but still exercise the real UI.
-            GameUI->InitializeMenu(!FParse::Param(FCommandLine::Get(), TEXT("ARTestProfile")));
+            const auto* State = GetGameInstance<UARRunGameInstance>();
+            GameUI->InitializeMenu(!FParse::Param(FCommandLine::Get(), TEXT("ARTestProfile")) && (!State || !State->bHasDepartedTown));
             GameUI->AddToViewport();
         }
     }

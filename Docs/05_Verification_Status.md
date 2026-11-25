@@ -1,6 +1,6 @@
 # 当前验证记录
 
-最新状态：0.9 已整合 Kuangxin 的地图、三个战斗房间蓝图及营地蓝图，默认关卡为 `L_FrontierDungeon`。默认回归配置 11 项和旧灰盒配置 10 项均通过；Editor / Game 与蓝图编译、GPU 新地图复验通过。当前证据见 [地图整合记录](15_Team_Map_Integration.md)。0.8 战斗反馈与 AudioMixer 历史分析见 `12_Combat_Feedback.md`。下文保留早期历史排障记录，其中未接入玩法的描述已被后续版本取代。
+最新状态：0.10 已接入 Kuangxin 的主城与两张地牢，默认关卡为 `Map_Hub`。最新回归、烘焙和截图证据见 [主城与两张地牢](16_Town_Expeditions.md)。0.9 的经典地牢与旧版测试见 [地图整合记录](15_Team_Map_Integration.md)。0.8 战斗反馈与 AudioMixer 历史分析见 `12_Combat_Feedback.md`。下文保留早期历史排障记录。
 
 记录日期：2026-10-28。此文件区分磁盘上已有的产物与尚未通过的运行验证。
 

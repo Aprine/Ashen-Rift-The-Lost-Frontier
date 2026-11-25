@@ -4,38 +4,40 @@ English | [简体中文](README.zh-CN.md)
 
 A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and Blueprints**. Explore dungeons, collect loot, buy supplies, and choose between extracting safely or pushing deeper for greater rewards and permanent progression.
 
-**Version:** 0.9 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with an integrated environment
+**Version:** 0.10 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with a town and two expedition maps
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
-![Integrated dungeon with Kuangxin's editable barrier layout](Docs/Images/frontier-dungeon.png)
+![Player in Kuangxin's town at the start of an expedition](Docs/Images/expedition-town.png)
 
 ## The central decision
 
-Every run asks how much you are willing to risk. Spending run gold on potions and temporary damage upgrades can improve your chances against later enemies, but leaves less gold to extract. At the supply room, you can secure your loot or continue towards an elite enemy and the Ashen Warden for additional gold and runes.
+Every run asks how much you are willing to risk. Pick one of two dungeons from town. Spending run gold on potions and temporary damage upgrades can improve your chances against later enemies, but leaves less gold to extract. You can return to the extraction portal to save your loot or press on toward the elite and the Ashen Warden for more rewards.
 
 Successful extraction stores remaining items and currency. Runes purchase permanent talents, and stored equipment can be taken into later runs. Bringing stronger gear helps you fight, but that gear is also lost if you die before extracting. Uncarried stash items, banked currency and purchased talents remain safe.
 
 ```text
-Camp preparation → Combat rooms → Supply room
-                                     ├─ Extract → Save loot → Return to camp
-                                     └─ Continue → Elite and Boss → Return to extract
+Town preparation → Choose Dungeon 1 or Dungeon 2 → Explore and collect loot
+                                                      ├─ Extract → Save loot → Return to town
+                                                      └─ Continue → Elite and Boss → Return to extract
 ```
 
 ## Features
 
 - **Two classes:** a melee Warrior with Whirlwind and a ranged Mage with mana-based spells and Arcane Burst.
 - **Three enemy types and one Boss:** Raiders, projectile-firing Hexers, heavy-attacking Sentinels and the Ashen Warden, with readable attack warnings and opportunities to dodge or use cover.
-- **Shuffled combat layouts:** Pillars, Barricade and Cross change order between runs. Fixed seeds reproduce layout order; the connected main route stays fixed.
-- **Teammate environment integration:** Kuangxin's KayKit dungeon map, three editable room Blueprints and a furnished camp are connected to the existing gameplay. The original greybox map remains available.
+- **Town and two expeditions:** Kuangxin's town and two hand-authored dungeons use the existing classes, stash, shop, enemies, Boss and extraction system. Choose a dungeon from the preparation panel and return to town after settlement.
+- **Classic shuffled layouts:** the previous `L_FrontierDungeon` remains playable in Classic mode. Its three editable combat-room Blueprints, Pillars, Barricade and Cross, still change order according to the seed.
 - **Equipment and economy:** weapon, armour and charm slots, drops, potions, limited shop stock and temporary damage upgrades.
 - **Persistent progression:** shared Vitality and Might talents, item storage and camp loadout preparation.
 - **Clickable Chinese UI:** main menu, camp, inventory, trader, pause and settlement screens, with keyboard shortcuts retained.
 - **Combat feedback:** five basic skeletal overlay animations, hit flashes, sparks, actual damage numbers, light camera feedback and eleven originally synthesised sound effects.
 
-![Integrated camp with Kuangxin's furnished Blueprint layout](Docs/Images/frontier-camp.png)
+![Dungeon 1 with the stone corridors and lit alcoves of the first expedition](Docs/Images/expedition-dungeon-1.png)
 
-*Screenshots are from version 0.9 environment validation using an isolated test profile. Enemies were cleared for the dungeon navigation check.*
+![Dungeon 2 with the different room layout of the second expedition](Docs/Images/expedition-dungeon-2.png)
+
+*These are in-game captures from version 0.10 using an isolated test profile.*
 
 ## Requirements
 
@@ -72,9 +74,9 @@ $ueRoot = 'D:\Epic Games\UE_4.27'
 .\Tools\PlayPrototype.ps1 -EngineRoot $ueRoot
 ```
 
-Alternatively, open `AshenRift.uproject` in UE 4.27.2 after building and press **Play**. The default map is `/Game/AshenRift/Maps/L_FrontierDungeon`. The preserved version 0.8 greybox is `/Game/AshenRift/Maps/L_RandomDungeon`.
+The default map is `/Game/AshenRift/Maps/Map_Hub`. Open the project in UE 4.27.2 to edit it, or use the standalone script above for cross-map gameplay. Pass `-Classic` to the play script to start `/Game/AshenRift/Maps/L_FrontierDungeon`. The earlier greybox remains available at `/Game/AshenRift/Maps/L_RandomDungeon`.
 
-Choose a class in the main menu, enter camp, prepare your equipment or purchase talents, then depart for the dungeon. Mouse buttons and keyboard shortcuts are both supported.
+Choose a class in the main menu, enter town, prepare equipment or buy talents, then click **Dungeon 1** or **Dungeon 2** in the preparation panel. **E** departs for Dungeon 1. Press **R** at settlement to return to town.
 
 To compile the Development game target:
 
@@ -93,7 +95,8 @@ The play script uses your local Unreal installation. The Development game execut
 | Basic attack / Mage projectile | Left mouse button |
 | Class skill | F |
 | Use a potion | Q |
-| Interact, trade, depart or extract | E |
+| Interact, trade, depart for Dungeon 1 or extract | E |
+| Depart for Dungeon 2 | Dungeon 2 button in town preparation |
 | Open inventory | Tab |
 | Equip or unequip weapon / armour / charm | Z / X / C |
 | Open camp preparation | B, while near camp |
@@ -120,7 +123,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 
 ## Validation
 
-On **6 November 2026**, the default regression configuration passed **eleven automated tests** (three core and eight integration tests); the preserved greybox configuration passed its ten-test suite. Coverage includes health, inventory, room seeds, the run loop, progression, dungeon navigation, camp management, enemy variants, UI, combat feedback and teammate-map integration.
+The suite covers health, inventory, room seeds, the run loop, progression, dungeon navigation, camp management, enemy variants, UI, combat feedback and travel from town into both expeditions. Check the [0.10 integration notes](Docs/16_Town_Expeditions.md) for the latest run results.
 
 Run the existing suite after building the editor module:
 
@@ -130,7 +133,7 @@ Run the existing suite after building the editor module:
 
 The script checks fresh reports and assertion results. Integration tests use isolated save profiles. Logs and reports are generated under `Saved/`, which is excluded from version control.
 
-Version 0.9 adds `Integration.TeamMap` for authored prefab spawning, door clearance, all six layout permutations, camp reuse and extraction/death settlement. The default suite targets the integrated map; select the historical map with `-DungeonMap /Game/AshenRift/Maps/L_RandomDungeon`. Current integration results are recorded in the [map integration notes](Docs/15_Team_Map_Integration.md).
+Use `-Only Integration.Expeditions` for the town and cross-map run regression. The historical map suite can be run with `-DungeonMap /Game/AshenRift/Maps/L_RandomDungeon`.
 
 Rendered checks and engine audio-output analysis are documented in the development notes. Player balance studies, performance benchmarks and packaged-build acceptance are still pending.
 
@@ -160,6 +163,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 | Topic | Documentation |
 |---|---|
+| Version 0.10 town, two expeditions and new screenshots | [Town and expeditions](Docs/16_Town_Expeditions.md) |
 | Version 0.9 teammate environment integration | [Map integration](Docs/15_Team_Map_Integration.md) |
 | Editing room and camp Blueprints | [Room layouts](Docs/13_Editable_Room_Layouts.md) / [Camp layout](Docs/14_Camp_Room_Blueprint.md) |
 | Environment asset provenance and license | [Third-party assets](Docs/ThirdPartyAssets.md) |
@@ -175,7 +179,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 ## Current limitations and next steps
 
 - The integrated environment uses KayKit assets and retains some greybox support geometry. Characters and weapons still use template or simple placeholder visuals. Some scene signs remain in English.
-- Layout order varies, but the main route has no procedural branches or maze topology.
+- Both expedition maps have fixed, authored routes. The Classic dungeon shuffles combat-room layouts along its fixed route.
 - Combat animations are basic generated overlays. Damage still uses existing gameplay timing rather than animation-driven hit events.
 - The stash has a fixed item list without item instances, random affixes, crafting or insurance.
 - Sound settings currently provide a session-level on/off toggle. Background music, volume sliders and final mixing remain future work.
@@ -189,7 +193,7 @@ The next stage focuses on playtesting preparation–spending–extraction decisi
 Developed as a **COMP 4900SEF Group 23** course project.
 
 - The starting character, movement animations and template dependencies come from Epic Games' Unreal Engine Third Person template.
-- [Kuangxin's contributed map](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/e2dfc0b83847e912f477b9bc0ecd9c0046c2f729) supplies the dungeon environment and editable room/camp layouts. KayKit environment assets are by [Kay Lousberg](https://kaylousberg.itch.io/kaykit-dungeon-pack), under CC0; see [asset provenance](Docs/ThirdPartyAssets.md).
+- Kuangxin contributed the [town](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/504548eab670760d630f93ac4df2280e31786df3), [two expeditions](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/28409168f8af23470a03b9a3b0da41e12dc404e6) and [Classic room and camp layouts](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/e2dfc0b83847e912f477b9bc0ecd9c0046c2f729). [Asset provenance](Docs/ThirdPartyAssets.md) credits the KayKit packs by Kay Lousberg and records the delivered ground materials.
 - The five basic combat overlay animations and eleven synthesised sound effects were generated for this project. Audio source files and the generation script are included.
 - Diablo, Path of Exile and Hades provided design inspiration.
 

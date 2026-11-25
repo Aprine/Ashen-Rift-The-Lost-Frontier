@@ -9,6 +9,7 @@
 #include "ARProfile.h"
 #include "ARGameWidget.h"
 #include "ARCombatFeedback.h"
+#include "ARExpeditionSite.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -80,8 +81,14 @@ void AARPlayerCharacter::BeginPlay()
     Super::BeginPlay();
     Health->OnDied.AddDynamic(this, &AARPlayerCharacter::Died);
     Health->OnDamaged.AddDynamic(this, &AARPlayerCharacter::Damaged);
+    if (const auto* State = Run(this)) SelectedClass = State->TravelClass;
     ResetCombatForRun();
-    if (Controller) Controller->SetControlRotation(FRotator(-15, 0, 0));
+    if (Controller)
+    {
+        const auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>();
+        Controller->SetControlRotation(FRotator(-15, Mode ? Mode->CampYaw() : 0, 0));
+    }
+    if (const auto* State = Run(this)) if (!State->LastError.IsEmpty()) ShowNotice(State->LastError);
 }
 void AARPlayerCharacter::SetupPlayerInputComponent(UInputComponent* Input)
 {
@@ -180,7 +187,7 @@ void AARPlayerCharacter::Interact()
     if (bShopOpen) { bShopOpen = false; ActiveShop = nullptr; return; }
     if (State->Phase == EARRunPhase::Hub)
     {
-        if (FVector::Dist2D(GetActorLocation(), FVector(-700, 0, 0)) > 650)
+        if (!IsAtCamp())
         { ShowNotice(TEXT("Return to the camp to enter the dungeon")); return; }
         if (auto* Mode = Cast<AARPrototypeGameMode>(GetWorld()->GetAuthGameMode())) Mode->StartDungeon(this);
         return;
@@ -218,7 +225,13 @@ void AARPlayerCharacter::Tick(float DeltaSeconds)
         { State->CancelExtraction(); ExtractUntil = 0; ShowNotice(TEXT("Extraction cancelled")); }
         else if (ExtractionRemaining() <= 0) State->SettleRun(true, Inventory);
     }
-    if (State && CanPlay() && GetActorLocation().Z < -500) Health->ReceiveDamage(Health->MaxHealth);
+    if (State && GetActorLocation().Z < -500)
+    {
+        if (CanPlay()) Health->ReceiveDamage(Health->MaxHealth);
+        else if (State->Phase == EARRunPhase::Hub)
+            if (const auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>())
+                if (Mode->IsExpeditionTown()) ResetForHub();
+    }
 }
 void AARPlayerCharacter::Damaged()
 {
@@ -242,7 +255,11 @@ void AARPlayerCharacter::ReturnOrRetry()
     if (!State) return;
     if (State->Phase == EARRunPhase::Settling) { State->RetrySave(); return; }
     if (!State->ReturnToHub()) return;
-    if (auto* Mode = Cast<AARPrototypeGameMode>(GetWorld()->GetAuthGameMode())) Mode->ClearRunActors();
+    if (auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>())
+    {
+        Mode->ClearRunActors();
+        if (Mode->ReturnFromExpedition(this)) return;
+    }
     for (TActorIterator<AARDungeonDirector> It(GetWorld()); It; ++It)
     {
         It->EnsureCampLayout();
@@ -256,8 +273,10 @@ void AARPlayerCharacter::ResetForHub()
     ResetCombatForRun();
     GetCharacterMovement()->SetMovementMode(MOVE_Walking);
     GetCharacterMovement()->StopMovementImmediately();
-    SetActorLocationAndRotation(FVector(-700, 0, 100), FRotator::ZeroRotator, false, nullptr, ETeleportType::TeleportPhysics);
-    if (Controller) Controller->SetControlRotation(FRotator(-15, 0, 0));
+    const auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>();
+    const float Yaw = Mode ? Mode->CampYaw() : 0;
+    SetActorLocationAndRotation(Mode ? Mode->CampLocation() : FVector(-700, 0, 100), FRotator(0, Yaw, 0), false, nullptr, ETeleportType::TeleportPhysics);
+    if (Controller) Controller->SetControlRotation(FRotator(-15, Yaw, 0));
     NextAttackTime = ExtractUntil = 0;
     bInventoryVisible = false;
     bCampOpen = false;
@@ -416,6 +435,12 @@ void AARPrototypeGameMode::ClearRunActors()
 }
 bool AARPrototypeGameMode::StartDungeon(AARPlayerCharacter* Player)
 {
+    if (IsExpeditionTown()) return DepartTown(Player, 0);
+    return EnterDungeon(Player);
+}
+
+bool AARPrototypeGameMode::EnterDungeon(AARPlayerCharacter* Player)
+{
     auto* State = Run(this);
     AARDungeonDirector* Director = nullptr;
     for (TActorIterator<AARDungeonDirector> It(GetWorld()); It; ++It) { Director = *It; break; }
@@ -433,16 +458,39 @@ bool AARPrototypeGameMode::StartDungeon(AARPlayerCharacter* Player)
     for (TActorIterator<AARShop> It(GetWorld()); It; ++It) It->ResetStock();
     Player->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
     Player->GetCharacterMovement()->StopMovementImmediately();
-    Player->SetActorLocationAndRotation(FVector(1450, 0, 100), FRotator::ZeroRotator, false, nullptr, ETeleportType::TeleportPhysics);
-    if (Player->Controller) Player->Controller->SetControlRotation(FRotator(-15, 0, 0));
-    if (Director) Director->Populate(Player, EnemyClass, RangedEnemyClass, EliteEnemyClass, BossClass);
+    const FVector Entry = ExpeditionSite ? ExpeditionSite->GetActorLocation() : FVector(1450, 0, 100);
+    const float EntryYaw = ExpeditionSite ? ExpeditionSite->GetActorRotation().Yaw : 0;
+    Player->SetActorLocationAndRotation(Entry, FRotator(0, EntryYaw, 0), false, nullptr, ETeleportType::TeleportPhysics);
+    if (Player->Controller) Player->Controller->SetControlRotation(FRotator(-15, EntryYaw, 0));
+    if (ExpeditionSite)
+    {
+        const FTransform SiteTransform = ExpeditionSite->GetActorTransform();
+        for (int32 Index = 0; Index < ExpeditionSite->EncounterOffsets.Num(); ++Index)
+        {
+            const FVector Position = SiteTransform.TransformPosition(ExpeditionSite->EncounterOffsets[Index]);
+            const auto SpawnClass = Index == 1 ? RangedEnemyClass : Index == 2 ? EliteEnemyClass : EnemyClass;
+            const FTransform SpawnTransform((Entry - Position).Rotation(), Position);
+            if (auto* Enemy = GetWorld()->SpawnActorDeferred<AAREnemy>(SpawnClass, SpawnTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn))
+            {
+                Enemy->DropItemID = Index == 0 ? TEXT("LeatherArmor") : Index == 1 ? TEXT("RunicCharm") :
+                    Player->SelectedClass == EARPlayerClass::Mage ? TEXT("OakStaff") : TEXT("IronSword");
+                UGameplayStatics::FinishSpawningActor(Enemy, SpawnTransform);
+            }
+        }
+        if (BossClass)
+        {
+            const FVector Position = SiteTransform.TransformPosition(ExpeditionSite->BossOffset);
+            GetWorld()->SpawnActor<AARBoss>(BossClass, Position, (Entry - Position).Rotation());
+        }
+    }
+    else if (Director) Director->Populate(Player, EnemyClass, RangedEnemyClass, EliteEnemyClass, BossClass);
     else
     {
         for (const FVector& Position : { FVector(2400, 0, 100), FVector(3100, 250, 100), FVector(4200, 0, 100) })
             GetWorld()->SpawnActor<AAREnemy>(EnemyClass, Position, FRotator(0, 180, 0));
         if (BossClass) GetWorld()->SpawnActor<AARBoss>(BossClass, FVector(7400, 0, 150), FRotator(0, 180, 0));
     }
-    const FTransform PotionTransform(FVector(1650, 0, 55));
+    const FTransform PotionTransform(ExpeditionSite ? ExpeditionSite->GetActorTransform().TransformPosition(ExpeditionSite->SupplyOffset) : FVector(1650, 0, 55));
     auto* Potion = GetWorld()->SpawnActorDeferred<AARLoot>(AARLoot::StaticClass(), PotionTransform);
     if (Potion)
     {

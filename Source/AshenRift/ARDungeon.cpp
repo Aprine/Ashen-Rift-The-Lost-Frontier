@@ -23,6 +23,8 @@
 #include "Builders/CubeBuilder.h"
 #include "Model.h"
 #include "Components/BrushComponent.h"
+#include "Engine/Level.h"
+#include "RenderingThread.h"
 #endif
 
 AARDungeonRoom::AARDungeonRoom()
@@ -291,6 +293,23 @@ AActor* UARDungeonEditorLibrary::CreateNavigationBounds(UObject* WorldContext, F
     return Bounds;
 #else
     return nullptr;
+#endif
+}
+
+bool UARDungeonEditorLibrary::ClearInheritedMapLighting(UObject* WorldContext)
+{
+#if WITH_EDITOR
+    auto* World = Cast<UWorld>(WorldContext);
+    if (!World || World->WorldType != EWorldType::Editor || !World->PersistentLevel) return false;
+    auto* Level = World->PersistentLevel;
+    Level->ReleaseRenderingResources();
+    FlushRenderingCommands();
+    Level->MapBuildData = nullptr;
+    Level->InitializeRenderingResources();
+    Level->MarkPackageDirty();
+    return true;
+#else
+    return false;
 #endif
 }
 
