@@ -8,7 +8,7 @@ A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and 
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
-![Player in Kuangxin's town at the start of an expedition](Docs/Images/expedition-town.png)
+![The castle, market and streets of Kuangxin's town](Docs/Images/town-castle-and-market.png)
 
 ## The central decision
 
@@ -33,11 +33,11 @@ Town preparation → Choose Dungeon 1 or Dungeon 2 → Explore and collect loot
 - **Clickable Chinese UI:** main menu, camp, inventory, trader, pause and settlement screens, with keyboard shortcuts retained.
 - **Combat feedback:** five basic skeletal overlay animations, hit flashes, sparks, actual damage numbers, light camera feedback and eleven originally synthesised sound effects.
 
-![Dungeon 1 with the stone corridors and lit alcoves of the first expedition](Docs/Images/expedition-dungeon-1.png)
+![Dungeon 1 with the trader on the left and the blue extraction portal through the right doorway](Docs/Images/dungeon-1-trader-and-extraction.png)
 
-![Dungeon 2 with the different room layout of the second expedition](Docs/Images/expedition-dungeon-2.png)
+![The player faces the Ashen Warden in a torchlit room in Dungeon 2](Docs/Images/dungeon-2-ashen-warden.png)
 
-*These are in-game captures from version 0.10 using an isolated test profile.*
+*Version 0.10 screenshots captured in UE4.27.2 at 1920 × 1080 with the HUD hidden.*
 
 ## Requirements
 

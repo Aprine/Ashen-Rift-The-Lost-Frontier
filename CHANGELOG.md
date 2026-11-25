@@ -26,7 +26,7 @@ Version entries describe the implemented prototype and its recorded validation. 
 
 - Rebound the new maps to Ashen Rift gameplay and made authored doorway openings and floor seams traversable by player and navigation agents.
 - Added fill lights for character and room readability, and kept enemy labels from overlapping the HUD and other enemy labels.
-- Replaced the English and Chinese README previews with actual in-game captures of the town and both new dungeons, stored under `Docs/Images` with matching relative links.
+- Retook the town and dungeon screenshots at 1920 × 1080 with the HUD hidden. Updated the English and Chinese READMEs and the expedition notes to use the new views of the town, the Dungeon 1 trader and extraction portal, and the Ashen Warden in Dungeon 2.
 
 ### Validation
 

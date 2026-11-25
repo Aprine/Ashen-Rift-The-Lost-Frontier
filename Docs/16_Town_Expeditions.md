@@ -10,7 +10,7 @@ Kuangxin 在 0.9 地图之后新增了 [主城 `Map_Hub`](https://github.com/kua
 
 后续调整遭遇位置时，可以选中不同关卡里的 `ExpeditionSite` 修改出生点附近的敌人、Boss 与初始补给偏移。商店和撤离点是地图演员，可在关卡编辑器中移动。两张新地牢及主城已加入地图烘焙清单。
 
-当前版本的 [主城](Images/expedition-town.png)、[地牢一](Images/expedition-dungeon-1.png)和[地牢二](Images/expedition-dungeon-2.png)截图来自 `-ARTestProfile` 的实际渲染。中英文 README 使用相同的仓库图片文件与相对路径。0.9 的截图留在对应历史说明中。
+当前版本的 [主城](Images/town-castle-and-market.png)、[地牢一](Images/dungeon-1-trader-and-extraction.png)和[地牢二](Images/dungeon-2-ashen-warden.png)截图由 UE4.27.2 使用独立测试存档重新拍摄，分辨率为 1920 × 1080。镜头展示了主城全景、地牢一的商人和撤离点，以及地牢二的灰烬守望者。拍摄时隐藏了 HUD，并微调了地牢镜头的曝光。中英文 README 使用相同的仓库图片文件与相对路径。0.9 的截图留在对应历史说明中。
 
 这次实机截图检查发现，入口火把不足以照清人物，两个房间的敌人名字也会叠在一起或盖住 HUD。地牢增加了低强度补光，保留原来火把的暖光。界面优先显示距离较近、位置不和其他标签及 HUD 重叠的敌人名称与血条。
 

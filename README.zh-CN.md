@@ -8,7 +8,7 @@
 
 [更新日志](CHANGELOG.md) · [开发记录](#开发记录)
 
-![出发前站在 Kuangxin 制作的主城里的玩家](Docs/Images/expedition-town.png)
+![Kuangxin 制作的主城，画面展示城堡、市集和街道](Docs/Images/town-castle-and-market.png)
 
 ## 核心决策
 
@@ -33,11 +33,11 @@
 - **可点击的中文界面：**主菜单、营地、背包、商店、暂停和结算界面，同时保留键盘快捷键。
 - **战斗反馈：**五段基础骨骼叠加动画、受击闪烁、火花、实际伤害数字、轻微镜头反馈，以及十一个原创合成音效。
 
-![地牢一的石质走廊和点灯的壁龛](Docs/Images/expedition-dungeon-1.png)
+![地牢一，左侧是商人，右侧门后是蓝色撤离传送阵](Docs/Images/dungeon-1-trader-and-extraction.png)
 
-![地牢二中不同的房间布局](Docs/Images/expedition-dungeon-2.png)
+![玩家在地牢二的火把照明下迎战灰烬守望者](Docs/Images/dungeon-2-ashen-warden.png)
 
-*截图取自 0.10 版游戏内，使用独立测试存档。*
+*0.10 版截图由 UE4.27.2 实机渲染，分辨率为 1920 × 1080，拍摄时隐藏了 HUD。*
 
 ## 环境要求
 
