@@ -16,6 +16,18 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.15 — 2026-11-26
+
+### Added
+
+- Added Random Ruins as a standalone mode from the town preparation panel, with eight seeded rooms, a merchant, a guarded storeroom and timed extraction.
+- Added an optional Ashen Warden encounter off the elite room. The Warden drops a guaranteed Runic Charm, and the route map shows the encounter and surviving enemies.
+- Random Ruins shares the three difficulty tiers and settlement rules with Random Expedition. Extracting at the highest unlocked tier unlocks the next one.
+
+### Validation
+
+- Passed all 15 regression tests. Checked 128 seeded layouts and verified the complete Random Ruins loop in UE4 with seeds 9 and 28. Development Editor and Game builds, Blueprint compilation and the seven-map WindowsNoEditor cook passed. The [Random Ruins notes](Docs/21_Random_Ruins.md) include a screenshot captured in UE4.27.2.
+
 ## 0.14 — 2026-11-26
 
 ### Added

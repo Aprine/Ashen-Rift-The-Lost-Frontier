@@ -14,7 +14,7 @@ class UStaticMesh;
 class UStaticMeshComponent;
 class UMaterialInterface;
 
-enum class EARBranchRoom : uint8 { Entry, Guard, Junction, Supplies, Elite, Exit, Cache, Count };
+enum class EARBranchRoom : uint8 { Entry, Guard, Junction, Supplies, Elite, Exit, Cache, Boss, Count };
 
 // Each edge connects two room indices. The same pair defines a map line and
 // the physical doorway. Cells with a shared edge can be crossed both ways.
@@ -23,7 +23,7 @@ struct FARBranchPlan
     TArray<FIntPoint> Cells;
     TArray<FIntPoint> Edges;
     bool Connects(int32 A, int32 B) const;
-    static FARBranchPlan Generate(int32 Seed);
+    static FARBranchPlan Generate(int32 Seed, bool bIncludeBoss = false);
 };
 
 USTRUCT()
@@ -75,20 +75,24 @@ public:
 
     static constexpr int32 RoomSize = 2000;
     UPROPERTY(EditInstanceOnly, Category="Branch") AARExpeditionPassage* Entrance = nullptr;
+    UPROPERTY(EditInstanceOnly, Category="Branch") bool bStandalone = false;
     UPROPERTY(EditAnywhere, Category="Branch") UStaticMesh* FloorMesh = nullptr;
     UPROPERTY(EditAnywhere, Category="Branch") UStaticMesh* WallMesh = nullptr;
     UPROPERTY(EditAnywhere, Category="Branch") UStaticMesh* FrameMesh = nullptr;
     UPROPERTY(EditAnywhere, EditFixedSize, Category="Branch") TArray<FARBranchRoomStyle> RoomStyles;
 
     void Prepare(int32 Seed, EARPlayerClass PlayerClass);
-    bool Build(AARPlayerCharacter* Player);
+    bool Build(AARPlayerCharacter* Player, int32 Tier);
     bool IsPrepared() const { return bPrepared; }
     bool IsBuilt() const { return bBuilt; }
     const FARBranchPlan& Plan() const { return Layout; }
     int32 RoomAt(const FVector& Position) const;
     FVector Center(int32 Room) const;
     FVector Goal(int32 Room) const;
+    FVector StartingLocation() const;
+    float StartingYaw() const;
     FName EliteReward() const { return Reward; }
+    static FName BossReward() { return TEXT("RunicCharm"); }
     bool CacheHoldsRunes() const { return bCacheRunes; }
     bool WasVisited(int32 Room) const { return Visited.Contains(Room); }
     bool WasCacheClaimed() const;

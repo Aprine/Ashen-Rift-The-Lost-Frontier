@@ -187,7 +187,7 @@ public:
             if (!Test.TestTrue(TEXT("The route board can preview the generated graph"),
                 UI->FindAction(TEXT("BranchMap")) && UI->ExecuteAction(TEXT("BranchMap")) &&
                 UI->CurrentScreen() == EARUIScreen::BranchMap)) return true;
-            for (int32 Room = 0; Room < Id(EARBranchRoom::Count); ++Room)
+            for (int32 Room = 0; Room < Id(EARBranchRoom::Boss); ++Room)
                 Test.TestNotNull(TEXT("Every graph node can be selected"), UI->FindAction(TEXT("TrackBranchRoom"), Room));
             ReadyAt = World->GetTimeSeconds() + .4f;
             Stage = 2;
@@ -225,7 +225,7 @@ public:
             int32 Modules = 0;
             for (TActorIterator<AActor> It(World); It; ++It)
                 if (It->ActorHasTag(TEXT("BranchModule"))) ++Modules;
-            if (!Test.TestEqual(TEXT("Exactly seven room modules were instantiated"), Modules, Id(EARBranchRoom::Count))) return true;
+            if (!Test.TestEqual(TEXT("Exactly seven room modules were instantiated"), Modules, Id(EARBranchRoom::Boss))) return true;
             if (!ValidateDoors(World, Wing, Player)) return true;
             Player->ToggleBranchMap();
             if (!Test.TestTrue(TEXT("M shows the current room in the wing"),
@@ -337,7 +337,7 @@ bool FARBranchWingTest::RunTest(const FString& Parameters)
         const auto Repeated = FARBranchPlan::Generate(Sample);
         TSet<FIntPoint> Cells;
         for (const FIntPoint& Cell : Plan.Cells) Cells.Add(Cell);
-        bool bValid = Cells.Num() == Id(EARBranchRoom::Count) && Plan.Edges.Num() == Id(EARBranchRoom::Count);
+        bool bValid = Cells.Num() == Id(EARBranchRoom::Boss) && Plan.Edges.Num() == Id(EARBranchRoom::Boss);
         for (const FIntPoint& Edge : Plan.Edges)
         {
             const FIntPoint Delta = Plan.Cells[Edge.X] - Plan.Cells[Edge.Y];
@@ -347,9 +347,9 @@ bool FARBranchWingTest::RunTest(const FString& Parameters)
             bValid && Plan.Cells == Repeated.Cells && Plan.Edges == Repeated.Edges)) return false;
         TArray<int32> Reachable = { Id(EARBranchRoom::Entry) };
         for (int32 Index = 0; Index < Reachable.Num(); ++Index)
-            for (int32 Room = 0; Room < Id(EARBranchRoom::Count); ++Room)
+            for (int32 Room = 0; Room < Id(EARBranchRoom::Boss); ++Room)
                 if (Plan.Connects(Reachable[Index], Room)) Reachable.AddUnique(Room);
-        if (!TestEqual(TEXT("Every generated room has a retreat path"), Reachable.Num(), Id(EARBranchRoom::Count))) return false;
+        if (!TestEqual(TEXT("Every generated room has a retreat path"), Reachable.Num(), Id(EARBranchRoom::Boss))) return false;
         Topologies.Add((Plan.Connects(Id(EARBranchRoom::Guard), Id(EARBranchRoom::Supplies)) ? 1 : 0) |
             (Plan.Connects(Id(EARBranchRoom::Guard), Id(EARBranchRoom::Exit)) ? 2 : 0) |
             (Plan.Connects(Id(EARBranchRoom::Cache), Id(EARBranchRoom::Supplies)) ? 4 : 0));

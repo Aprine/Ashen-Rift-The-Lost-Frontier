@@ -40,7 +40,7 @@ namespace
     }
 }
 
-FARBranchPlan FARBranchPlan::Generate(int32 Seed)
+FARBranchPlan FARBranchPlan::Generate(int32 Seed, bool bIncludeBoss)
 {
     FRandomStream Random(Seed ^ 0x1973cd);
     const int32 Fork = Id(EARBranchRoom::Junction);
@@ -62,6 +62,11 @@ FARBranchPlan FARBranchPlan::Generate(int32 Seed)
     Plan.Edges = { FIntPoint(Id(EARBranchRoom::Entry), Guard), FIntPoint(Guard, Fork),
         FIntPoint(SupplyParent, Supplies), FIntPoint(Fork, Elite), FIntPoint(ExitParent, Exit),
         FIntPoint(Elite, Cache), FIntPoint(Cache, bCacheToShop ? Supplies : Exit) };
+    if (bIncludeBoss)
+    {
+        Plan.Cells.Add(FIntPoint(2, 0));
+        Plan.Edges.Emplace(Elite, Id(EARBranchRoom::Boss));
+    }
     const FIntPoint Left(-Forward.Y, Forward.X);
     for (FIntPoint& Cell : Plan.Cells)
         Cell = FIntPoint(Cell.X * Forward.X + Cell.Y * Left.X, Cell.X * Forward.Y + Cell.Y * Left.Y);
@@ -166,18 +171,25 @@ AARExpeditionBranchWing::AARExpeditionBranchWing()
     Prop(EARBranchRoom::Exit, Chest.Object, 635, 590);
     Prop(EARBranchRoom::Cache, Keg.Object, -700, 630);
     Prop(EARBranchRoom::Cache, Boxes.Object, 595, -620);
+    Prop(EARBranchRoom::Boss, Pillar.Object, -720, 690, FVector(90, 85, 180));
+    Prop(EARBranchRoom::Boss, Pillar.Object, 720, -690, FVector(90, 85, 180));
     RoomStyles[Id(EARBranchRoom::Entry)].Light = FColor(148, 191, 225);
     RoomStyles[Id(EARBranchRoom::Elite)].Light = FColor(245, 132, 105);
     RoomStyles[Id(EARBranchRoom::Exit)].Light = FColor(107, 186, 238);
     RoomStyles[Id(EARBranchRoom::Cache)].Light = FColor(205, 214, 141);
+    RoomStyles[Id(EARBranchRoom::Boss)].Light = FColor(248, 144, 88);
 }
 
 void AARExpeditionBranchWing::PostLoad()
 {
     Super::PostLoad();
-    // Dungeon 3 instances saved before the cache had six editable styles.
-    if (RoomStyles.Num() == Id(EARBranchRoom::Cache))
-        RoomStyles.Add(GetDefault<AARExpeditionBranchWing>()->RoomStyles[Id(EARBranchRoom::Cache)]);
+    // Keep existing instance edits and add styles introduced after the map was saved.
+    if (RoomStyles.Num() < Id(EARBranchRoom::Count))
+    {
+        const auto& Defaults = GetDefault<AARExpeditionBranchWing>()->RoomStyles;
+        for (int32 Room = RoomStyles.Num(); Room < Defaults.Num(); ++Room)
+            RoomStyles.Add(Defaults[Room]);
+    }
 }
 
 void AARExpeditionBranchWing::Tick(float DeltaSeconds)
@@ -194,8 +206,8 @@ void AARExpeditionBranchWing::RecordVisit(const FVector& Position)
 
 void AARExpeditionBranchWing::Prepare(int32 Seed, EARPlayerClass PlayerClass)
 {
-    if (bPrepared || !IsValid(Entrance)) return;
-    Layout = FARBranchPlan::Generate(Seed);
+    if (bPrepared || (!bStandalone && !IsValid(Entrance))) return;
+    Layout = FARBranchPlan::Generate(Seed, bStandalone);
     FRandomStream Random(Seed ^ 0x50751);
     Reward = ARExpedition::ChooseEquipment(Random, PlayerClass);
     bCacheRunes = FRandomStream(Seed ^ 0x106c8b).RandRange(0, 1) != 0;
@@ -226,20 +238,32 @@ FVector AARExpeditionBranchWing::Goal(int32 Room) const
     return Center(Room);
 }
 
+FVector AARExpeditionBranchWing::StartingLocation() const
+{
+    const FVector Forward = (Center(Id(EARBranchRoom::Guard)) - Center(Id(EARBranchRoom::Entry))).GetSafeNormal2D();
+    return Center(Id(EARBranchRoom::Entry)) - Forward * 405 + FVector(0, 0, 105);
+}
+
+float AARExpeditionBranchWing::StartingYaw() const
+{
+    return (Center(Id(EARBranchRoom::Guard)) - Center(Id(EARBranchRoom::Entry))).Rotation().Yaw;
+}
+
 const TCHAR* AARExpeditionBranchWing::Name(int32 Room)
 {
-    const TCHAR* Names[] = { TEXT("入口"), TEXT("战斗"), TEXT("岔路"), TEXT("补给"), TEXT("精英"), TEXT("撤离"), TEXT("储藏") };
+    const TCHAR* Names[] = { TEXT("入口"), TEXT("战斗"), TEXT("岔路"), TEXT("补给"), TEXT("精英"), TEXT("撤离"), TEXT("储藏"), TEXT("首领") };
     return Room >= 0 && Room < Id(EARBranchRoom::Count) ? Names[Room] : TEXT("随机支路");
 }
 
 bool AARExpeditionBranchWing::IsEncounter(int32 Room)
 {
-    return Room == Id(EARBranchRoom::Guard) || Room == Id(EARBranchRoom::Elite) || Room == Id(EARBranchRoom::Cache);
+    return Room == Id(EARBranchRoom::Guard) || Room == Id(EARBranchRoom::Elite) ||
+        Room == Id(EARBranchRoom::Cache) || Room == Id(EARBranchRoom::Boss);
 }
 
 int32 AARExpeditionBranchWing::LivingEnemies(int32 Room) const
 {
-    if (!IsEncounter(Room)) return 0;
+    if (!Layout.Cells.IsValidIndex(Room) || !IsEncounter(Room)) return 0;
     if (!bBuilt) return Room == Id(EARBranchRoom::Guard) ? 2 : 1;
     int32 Count = 0;
     for (const TWeakObjectPtr<AAREnemy>& Enemy : RoomEnemies[Room])
@@ -326,24 +350,27 @@ AActor* AARExpeditionBranchWing::BuildRoom(int32 Room)
     return Shell;
 }
 
-bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player)
+bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player, int32 Tier)
 {
-    if (bBuilt) return IsValid(Return);
-    if (!bPrepared || !IsValid(Player) || !IsValid(Entrance) || !FloorMesh || !WallMesh || !FrameMesh ||
-        RoomStyles.Num() != Layout.Cells.Num()) return false;
+    if (bBuilt) return bStandalone || IsValid(Return);
+    if (!bPrepared || !IsValid(Player) || (!bStandalone && !IsValid(Entrance)) || !FloorMesh || !WallMesh || !FrameMesh ||
+        RoomStyles.Num() < Layout.Cells.Num()) return false;
     auto* World = GetWorld();
     auto* Mode = World->GetAuthGameMode<AARPrototypeGameMode>();
     auto* State = World->GetGameInstance<UARRunGameInstance>();
-    if (!Mode || !State || State->Phase != EARRunPhase::InDungeon) return false;
+    if (!Mode || !State || State->Phase != (bStandalone ? EARRunPhase::Hub : EARRunPhase::InDungeon)) return false;
 
     TArray<AActor*> Pending;
     for (int32 Room = 0; Room < Layout.Cells.Num(); ++Room)
     {
         if (AActor* Shell = BuildRoom(Room)) Pending.Add(Shell);
     }
-    const FVector Forward = (Center(Id(EARBranchRoom::Guard)) - Center(Id(EARBranchRoom::Entry))).GetSafeNormal2D();
-    Return = World->SpawnActor<AARExpeditionPassage>(AARExpeditionPassage::StaticClass(),
-        Center(Id(EARBranchRoom::Entry)) - Forward * 610 + FVector(0, 0, 14), Forward.Rotation());
+    if (!bStandalone)
+    {
+        const FVector Forward = (Center(Id(EARBranchRoom::Guard)) - Center(Id(EARBranchRoom::Entry))).GetSafeNormal2D();
+        Return = World->SpawnActor<AARExpeditionPassage>(AARExpeditionPassage::StaticClass(),
+            Center(Id(EARBranchRoom::Entry)) - Forward * 610 + FVector(0, 0, 14), Forward.Rotation());
+    }
     Shop = World->SpawnActor<AARShop>(AARShop::StaticClass(),
         Center(Id(EARBranchRoom::Supplies)) + FVector(420, -375, 60), FRotator::ZeroRotator);
     Exit = World->SpawnActor<AARPortal>(AARPortal::StaticClass(),
@@ -353,15 +380,18 @@ bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player)
     const FVector GuardAt = Center(Id(EARBranchRoom::Guard));
     const FVector EliteAt = Center(Id(EARBranchRoom::Elite)) + FVector(0, 0, 110);
     const FVector CacheAt = Center(Id(EARBranchRoom::Cache)) + FVector(-180, -140, 110);
-    auto* Guard = Mode->SpawnExpeditionEnemy(Mode->EnemyClass, GuardAt + FVector(-240, -95, 110), Center(0), NAME_None, State->ExpeditionTier);
-    auto* Hexer = Mode->SpawnExpeditionEnemy(Mode->RangedEnemyClass, GuardAt + FVector(255, 260, 110), Center(0), NAME_None, State->ExpeditionTier);
-    auto* Elite = Mode->SpawnExpeditionEnemy(Mode->EliteEnemyClass, EliteAt, Center(Id(EARBranchRoom::Junction)), Reward, State->ExpeditionTier);
+    auto* Guard = Mode->SpawnExpeditionEnemy(Mode->EnemyClass, GuardAt + FVector(-240, -95, 110), Center(0), NAME_None, Tier);
+    auto* Hexer = Mode->SpawnExpeditionEnemy(Mode->RangedEnemyClass, GuardAt + FVector(255, 260, 110), Center(0), NAME_None, Tier);
+    auto* Elite = Mode->SpawnExpeditionEnemy(Mode->EliteEnemyClass, EliteAt, Center(Id(EARBranchRoom::Junction)), Reward, Tier);
     auto* CacheGuard = Mode->SpawnExpeditionEnemy(bCacheRunes ? Mode->RangedEnemyClass : Mode->EnemyClass,
-        CacheAt, Center(Id(EARBranchRoom::Elite)), NAME_None, State->ExpeditionTier);
-    if (Pending.Num() != Layout.Cells.Num() || !Return || !Shop || !Exit || !Cache || !Guard || !Hexer || !Elite || !CacheGuard)
+        CacheAt, Center(Id(EARBranchRoom::Elite)), NAME_None, Tier);
+    auto* Boss = bStandalone ? Mode->SpawnExpeditionEnemy(Mode->BossClass.Get(),
+        Center(Id(EARBranchRoom::Boss)) + FVector(0, 0, 160), EliteAt, BossReward(), Tier) : nullptr;
+    if (Pending.Num() != Layout.Cells.Num() || (bStandalone ? !Boss : !Return) ||
+        !Shop || !Exit || !Cache || !Guard || !Hexer || !Elite || !CacheGuard)
     {
         for (AActor* Actor : Pending) Actor->Destroy();
-        AActor* Spawned[] = {Return, Shop, Exit, Cache, Guard, Hexer, Elite, CacheGuard};
+        AActor* Spawned[] = {Return, Shop, Exit, Cache, Guard, Hexer, Elite, CacheGuard, Boss};
         for (AActor* Actor : Spawned)
             if (IsValid(Actor)) Actor->Destroy();
         Return = nullptr;
@@ -370,10 +400,13 @@ bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player)
         Cache = nullptr;
         return false;
     }
-    Return->Prompt = FText::FromString(TEXT("返回地牢三大厅"));
-    Return->Destination = Entrance;
-    Entrance->Destination = Return;
-    Return->Mesh->SetMaterial(0, Entrance->Mesh->GetMaterial(0));
+    if (Return)
+    {
+        Return->Prompt = FText::FromString(TEXT("返回地牢三大厅"));
+        Return->Destination = Entrance;
+        Entrance->Destination = Return;
+        Return->Mesh->SetMaterial(0, Entrance->Mesh->GetMaterial(0));
+    }
     Shop->SetActorScale3D(FVector(.42, .42, .22));
     Shop->Mesh->SetMaterial(0, TraderMaterial);
     Shop->Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -383,6 +416,7 @@ bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player)
     RoomEnemies[Id(EARBranchRoom::Guard)] = { Guard, Hexer };
     RoomEnemies[Id(EARBranchRoom::Elite)].Add(Elite);
     RoomEnemies[Id(EARBranchRoom::Cache)].Add(CacheGuard);
+    if (Boss) RoomEnemies[Id(EARBranchRoom::Boss)].Add(Boss);
     bBuilt = true;
     SetActorTickEnabled(true);
     if (auto* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World)) Navigation->Build();

@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and Blueprints**. Explore dungeons, collect loot, buy supplies, and choose between extracting safely or pushing deeper for greater rewards and permanent progression.
 
-**Version:** 0.14 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with seeded expeditions and a modular branch in Dungeon 3
+**Version:** 0.15 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with three authored dungeons and the generated Random Ruins expedition
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
@@ -17,9 +17,9 @@ Every run asks how much you are willing to risk. Start a random expedition from 
 Successful extraction stores remaining items and currency. Runes purchase permanent talents, and stored equipment can be taken into later runs. Bringing stronger gear helps you fight, but that gear is also lost if you die before extracting. Uncarried stash items, banked currency and purchased talents remain safe.
 
 ```text
-Town preparation → Random expedition or manual dungeon → Explore and collect loot
-                                                          ├─ Supplies or elite → Continue exploring
-                                                          └─ Extract → Save loot → Return to town
+Town preparation → Random Expedition, Random Ruins or practice dungeon → Explore and collect loot
+                            ├─ Resupply or challenge an elite or Boss → Continue exploring
+                            └─ Extract → Save loot → Return to town
 ```
 
 ## Features
@@ -27,7 +27,8 @@ Town preparation → Random expedition or manual dungeon → Explore and collect
 - **Two classes:** a melee Warrior with Whirlwind and a ranged Mage with mana-based spells and Arcane Burst.
 - **Three enemy types and one Boss:** Raiders, projectile-firing Hexers, heavy-attacking Sentinels and the Ashen Warden, with readable attack warnings and opportunities to dodge or use cover.
 - **Town and three expeditions:** Choose one of Kuangxin's hand-authored dungeons from the preparation panel. Dungeon 3 has a larger layout with separate merchant and Boss areas. Both areas can be visited within the same run, with the player's health, inventory and run currency carried through each passage.
-- **Random expeditions and difficulty tiers:** A run seed selects the dungeon, enemy arrangement and equipment drops. Extraction at the highest unlocked tier opens the next of three tiers, with stronger enemies and better rewards.
+- **Random expeditions and difficulty tiers:** Random Expedition draws from the three authored dungeons. The run seed controls the draw, enemy arrangement and equipment drops. In Random Expedition and Random Ruins, extraction at the highest unlocked tier opens the next of three tiers, with stronger enemies and better rewards.
+- **Random Ruins:** Launch from town to explore eight connected rooms generated from the run seed. The route map shows the shop, guarded chest, optional Ashen Warden and blue extraction portal. The Warden drops a guaranteed Runic Charm.
 - **Dungeon 3 route board:** Preview the merchant, a seeded elite encounter with a listed equipment drop, or a seeded extraction destination. The board displays health, potions, gold and carried gear. Selecting a route tracks it on the HUD.
 - **Modular branch:** Preview seven interconnected rooms in Dungeon 3. The seed chooses how the rooms connect, and the dungeon assembles their doors and walkable floors on entry. The route map marks visited rooms and cleared threats and previews the elite drop and guarded storeroom reward.
 - **Classic shuffled layouts:** the previous `L_FrontierDungeon` remains playable in Classic mode. Its three editable combat-room Blueprints, Pillars, Barricade and Cross, still change order according to the seed.
@@ -79,7 +80,9 @@ $ueRoot = 'D:\Epic Games\UE_4.27'
 
 The default map is `/Game/AshenRift/Maps/Map_Hub`. Open the project in UE 4.27.2 to edit it, or use the standalone script above for cross-map gameplay. Pass `-Classic` to the play script to start `/Game/AshenRift/Maps/L_FrontierDungeon`. The earlier greybox remains available at `/Game/AshenRift/Maps/L_RandomDungeon`.
 
-Choose a class in the main menu, enter town and press **B** near the spawn to prepare. Select an unlocked difficulty tier and choose **Random expedition** or press **E**. The three named dungeon buttons launch practice runs. In Dungeon 3, find the **route board**, press **E**, then press **4** to preview the modular branch. Select a room, follow the HUD to the green passage and press **E** to enter. Press **M** inside the branch to reopen the map. Press **R** at settlement to return to town.
+Choose a class in the main menu, enter town and press **B** near the spawn to prepare. Select an unlocked difficulty tier and click **随机遗迹** (Random Ruins) to start a generated run. Press **M** to see the full layout and select a room to track on the HUD. Choose **随机出征** (Random Expedition) or press **E** to draw an authored dungeon. The three named dungeon buttons launch practice runs.
+
+In Dungeon 3, find the **route board**, press **E**, then press **4** to preview the modular branch. Select a room, follow the HUD to the green passage and press **E** to enter. Press **M** inside to reopen the map. Press **R** at settlement to return to town.
 
 The storeroom connects the elite room to either the merchant room or the exit. Defeat its guard and press **E** at the chest to claim two potions or two runes, as shown on the map.
 
@@ -101,9 +104,9 @@ The play script uses your local Unreal installation. The Development game execut
 | Class skill | F |
 | Use a potion | Q |
 | Interact, trade, view routes, start a random expedition or extract | E |
-| Select an expedition tier or launch a practice dungeon | Difficulty or dungeon buttons in town preparation |
+| Select a tier, launch Random Ruins or enter a practice dungeon | Buttons in town preparation |
 | Track supplies / elite / extraction | 1 / 2 / 3 or click the route board |
-| Preview and track the modular branch | 4 on the route board, or M near the branch entrance and inside |
+| Preview and track generated rooms | M in Random Ruins or near or inside the modular branch, or 4 on the route board |
 | Claim the guarded storeroom reward | E near the chest after defeating its guard |
 | Open inventory | Tab |
 | Equip or unequip weapon / armour / charm | Z / X / C |
@@ -123,7 +126,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 ## Run and progression rules
 
 - **Extraction:** remain in the blue portal for three seconds. Taking damage or leaving cancels the attempt. Defeating the Boss is optional.
-- **Expedition tiers:** only a successful random expedition at your highest unlocked tier opens the next tier. A newly unlocked tier is automatically selected for the next departure. Death leaves unlocked tiers available.
+- **Expedition tiers:** Extracting from Random Expedition or Random Ruins at your highest unlocked tier opens the next tier. A newly unlocked tier is automatically selected for the next departure. Death leaves unlocked tiers available.
 - **Death:** carried items, new loot and unextracted currency are lost. Uncarried stash stock, banked currency and permanent talents remain.
 - **Loadouts:** bring at most one of each equipment type and five potions, with a weapon matching your class. Stock is deducted and saved at departure, not while preparing. Selected equipment is automatically equipped on entry.
 - **Talents:** Vitality adds maximum health and Might adds damage. Both have three ranks, are shared by the classes and cost banked runes.
@@ -132,7 +135,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 
 ## Validation
 
-The suite covers health, inventory, room seeds, the run loop, progression, dungeon navigation, camp management, enemy variants, UI, combat feedback, all three expeditions, tier progression and the generated branch with its guarded chest. See the [0.14 storeroom notes](Docs/20_Storeroom_Routes.md) for the latest run results.
+The suite covers health, inventory, room seeds, the run loop, progression, navigation, camp management, enemy variants, UI, combat feedback, the three authored expeditions, the modular branch and a complete Random Ruins run. See the [0.15 Random Ruins notes](Docs/21_Random_Ruins.md) for validation results.
 
 Run the existing suite after building the editor module:
 
@@ -172,6 +175,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 | Topic | Documentation |
 |---|---|
+| Version 0.15 generated standalone expedition and optional Boss | [Random Ruins](Docs/21_Random_Ruins.md) |
 | Version 0.14 guarded storeroom and live route status | [Storeroom routes](Docs/20_Storeroom_Routes.md) |
 | Version 0.13 generated routes and modular rooms | [Modular branch](Docs/19_Modular_Branch.md) |
 | Version 0.12 random expeditions, tiers and route board | [Random expeditions and routes](Docs/18_Random_Expeditions.md) |
@@ -192,7 +196,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 ## Current limitations and next steps
 
 - The integrated environment uses KayKit assets and retains some greybox support geometry. Characters and weapons still use template or simple placeholder visuals. Some scene signs remain in English.
-- All three main expeditions use authored layouts. Dungeon 3 also has a generated wing with seven room types and four possible connection patterns. The Classic dungeon shuffles combat-room layouts along its fixed route.
+- Random Ruins uses a fixed set of eight room types. The seed varies their connections and orientation, with the Boss always connected to the elite room. Dungeon 3 also has a seven-room generated wing. The Classic dungeon shuffles combat-room layouts along its fixed route.
 - Combat animations are basic generated overlays. Damage still uses existing gameplay timing rather than animation-driven hit events.
 - The stash has a fixed item list without item instances, random affixes, crafting or insurance.
 - Sound settings currently provide a session-level on/off toggle. Background music, volume sliders and final mixing remain future work.

@@ -32,6 +32,7 @@ public:
     AARExpeditionSite();
 
     UPROPERTY(EditAnywhere, Category="Expedition") bool bTown = false;
+    UPROPERTY(EditInstanceOnly, Category="Expedition") AARExpeditionBranchWing* StandaloneWing = nullptr;
     UPROPERTY(EditAnywhere, Category="Expedition", meta=(MakeEditWidget)) TArray<FVector> EncounterOffsets;
     UPROPERTY(EditAnywhere, Category="Expedition", meta=(MakeEditWidget)) FVector BossOffset;
     UPROPERTY(EditAnywhere, Category="Expedition", meta=(MakeEditWidget)) FVector SupplyOffset;

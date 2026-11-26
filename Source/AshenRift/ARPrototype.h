@@ -167,6 +167,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bUseNavigation = false;
     UFUNCTION(BlueprintCallable) bool StartDungeon(AARPlayerCharacter* Player);
     bool DepartTown(AARPlayerCharacter* Player, int32 Destination);
+    static constexpr int32 RandomRuinsDeparture = -2;
     AAREnemy* SpawnRouteElite(AARPlayerCharacter* Player, FVector Position, FName RewardItem);
     AAREnemy* SpawnExpeditionEnemy(TSubclassOf<AAREnemy> Class, FVector Position, FVector Facing, FName Drop, int32 Tier);
     bool IsExpeditionTown() const;

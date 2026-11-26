@@ -505,8 +505,17 @@ bool AARPrototypeGameMode::EnterDungeon(AARPlayerCharacter* Player, int32 Seed, 
     auto* State = Run(this);
     AARDungeonDirector* Director = nullptr;
     for (TActorIterator<AARDungeonDirector> It(GetWorld()); It; ++It) { Director = *It; break; }
-    if (!Player || !State || !Player->IsAtCamp() || !State->BeginExpedition(Seed, Player->Inventory, Tier)) return false;
-    ClearRunActors();
+    if (!Player || !State || !Player->IsAtCamp()) return false;
+    auto* GeneratedWing = ExpeditionSite && IsValid(ExpeditionSite->StandaloneWing) ? ExpeditionSite->StandaloneWing : nullptr;
+    if (GeneratedWing)
+    {
+        // An incomplete generated world can be discarded before the stash transaction.
+        if (!GeneratedWing->bStandalone) return false;
+        GeneratedWing->Prepare(Seed, Player->SelectedClass);
+        if (!GeneratedWing->Build(Player, Tier)) return false;
+    }
+    if (!State->BeginExpedition(Seed, Player->Inventory, Tier)) return false;
+    if (!GeneratedWing) ClearRunActors();
     if (Director) Director->Generate(Seed);
     Player->ResetCombatForRun();
     Player->bCampOpen = Player->bInventoryVisible = false;
@@ -518,10 +527,25 @@ bool AARPrototypeGameMode::EnterDungeon(AARPlayerCharacter* Player, int32 Seed, 
     for (TActorIterator<AARShop> It(GetWorld()); It; ++It) It->ResetStock();
     Player->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
     Player->GetCharacterMovement()->StopMovementImmediately();
-    const FVector Entry = ExpeditionSite ? ExpeditionSite->GetActorLocation() : FVector(1450, 0, 100);
-    const float EntryYaw = ExpeditionSite ? ExpeditionSite->GetActorRotation().Yaw : 0;
+    const FVector Entry = GeneratedWing ? GeneratedWing->StartingLocation() :
+        ExpeditionSite ? ExpeditionSite->GetActorLocation() : FVector(1450, 0, 100);
+    const float EntryYaw = GeneratedWing ? GeneratedWing->StartingYaw() :
+        ExpeditionSite ? ExpeditionSite->GetActorRotation().Yaw : 0;
     Player->SetActorLocationAndRotation(Entry, FRotator(0, EntryYaw, 0), false, nullptr, ETeleportType::TeleportPhysics);
     if (Player->Controller) Player->Controller->SetControlRotation(FRotator(-15, EntryYaw, 0));
+    const FVector Supply = GeneratedWing ? Entry + FVector(0, 155, -55) :
+        ExpeditionSite ? ExpeditionSite->GetActorTransform().TransformPosition(ExpeditionSite->SupplyOffset) : FVector(1650, 0, 55);
+    auto* Potion = GetWorld()->SpawnActorDeferred<AARLoot>(AARLoot::StaticClass(), FTransform(Supply));
+    if (Potion)
+    {
+        Potion->ItemID = TEXT("Potion"); Potion->Quantity = 2;
+        UGameplayStatics::FinishSpawningActor(Potion, FTransform(Supply));
+    }
+    if (GeneratedWing)
+    {
+        Player->ShowNotice(TEXT("随机遗迹 · 按 M 查看本局地图，蓝色传送阵可直接撤离。"));
+        return true;
+    }
     if (ExpeditionSite)
     {
         const FTransform SiteTransform = ExpeditionSite->GetActorTransform();
@@ -558,13 +582,6 @@ bool AARPrototypeGameMode::EnterDungeon(AARPlayerCharacter* Player, int32 Seed, 
         for (const FVector& Position : { FVector(2400, 0, 100), FVector(3100, 250, 100), FVector(4200, 0, 100) })
             GetWorld()->SpawnActor<AAREnemy>(EnemyClass, Position, FRotator(0, 180, 0));
         if (BossClass) GetWorld()->SpawnActor<AARBoss>(BossClass, FVector(7400, 0, 150), FRotator(0, 180, 0));
-    }
-    const FTransform PotionTransform(ExpeditionSite ? ExpeditionSite->GetActorTransform().TransformPosition(ExpeditionSite->SupplyOffset) : FVector(1650, 0, 55));
-    auto* Potion = GetWorld()->SpawnActorDeferred<AARLoot>(AARLoot::StaticClass(), PotionTransform);
-    if (Potion)
-    {
-        Potion->ItemID = TEXT("Potion"); Potion->Quantity = 2;
-        UGameplayStatics::FinishSpawningActor(Potion, PotionTransform);
     }
     Player->ShowNotice(TEXT("Dungeon started. Defeat enemies or reach the blue extraction portal."));
     return true;

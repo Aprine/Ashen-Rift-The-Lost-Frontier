@@ -22,6 +22,7 @@
 namespace
 {
     const TCHAR* TownMap = TEXT("/Game/AshenRift/Maps/Map_Hub");
+    const TCHAR* ProceduralMap = TEXT("/Game/AshenRift/Maps/Map_RandomRuins");
     const TCHAR* DungeonMaps[] = {
         TEXT("/Game/AshenRift/Maps/Map_Dungeon1"),
         TEXT("/Game/AshenRift/Maps/Map_Dungeon2"),
@@ -99,7 +100,11 @@ bool AARExpeditionPassage::CanUse(const AARPlayerCharacter* Player) const
 bool AARExpeditionPassage::Use(AARPlayerCharacter* Player)
 {
     if (!CanUse(Player)) return false;
-    if (!IsValid(Destination) && (!BranchWing->Build(Player) || !IsValid(Destination))) return false;
+    if (!IsValid(Destination))
+    {
+        const auto* State = GetWorld()->GetGameInstance<UARRunGameInstance>();
+        if (!State || !BranchWing->Build(Player, State->ExpeditionTier) || !IsValid(Destination)) return false;
+    }
     const FVector Arrival = Destination->GetActorTransform().TransformPositionNoScale(Destination->ArrivalOffset);
     const float Yaw = Destination->GetActorRotation().Yaw;
     if (!Player->TeleportTo(Arrival, FRotator(0, Yaw, 0))) return false;
@@ -216,17 +221,18 @@ bool AARPrototypeGameMode::DepartTown(AARPlayerCharacter* Player, int32 Destinat
     auto* State = GetGameInstance<UARRunGameInstance>();
     const int32 MapCount = UE_ARRAY_COUNT(DungeonMaps);
     const bool bRandom = Destination == INDEX_NONE;
+    const bool bGenerated = Destination == RandomRuinsDeparture;
     if (!IsExpeditionTown() || !IsValid(Player) || !Player->IsAtCamp() || !State || !State->Profile ||
         State->Phase != EARRunPhase::Hub || !State->PendingExpedition.IsNone() ||
-        (!bRandom && (Destination < 0 || Destination >= MapCount))) return false;
+        (!bRandom && !bGenerated && (Destination < 0 || Destination >= MapCount))) return false;
 
     int32 Seed = FMath::Rand();
 #if !UE_BUILD_SHIPPING
-    if (bRandom && State->GetProfileSlot().StartsWith(TEXT("AshenRift_Automation_")))
+    if ((bRandom || bGenerated) && State->GetProfileSlot().StartsWith(TEXT("AshenRift_Automation_")))
         FParse::Value(FCommandLine::Get(), TEXT("ARExpeditionSeed="), Seed);
 #endif
     if (bRandom) Destination = ARExpedition::ChooseDungeon(Seed, MapCount);
-    const TCHAR* Map = DungeonMaps[Destination];
+    const TCHAR* Map = bGenerated ? ProceduralMap : DungeonMaps[Destination];
     if (!FPackageName::DoesPackageExist(Map))
     {
         Player->ShowNotice(TEXT("Dungeon map is unavailable"));
@@ -234,7 +240,7 @@ bool AARPrototypeGameMode::DepartTown(AARPlayerCharacter* Player, int32 Destinat
     }
     State->PendingExpedition = FName(Map);
     State->PendingExpeditionSeed = Seed;
-    State->PendingExpeditionTier = bRandom ? State->SelectedExpeditionTier() : 0;
+    State->PendingExpeditionTier = bRandom || bGenerated ? State->SelectedExpeditionTier() : 0;
     State->TravelClass = Player->SelectedClass;
     State->bHasDepartedTown = true;
     UGameplayStatics::OpenLevel(this, State->PendingExpedition);
@@ -255,7 +261,8 @@ void AARPrototypeGameMode::BeginAuthoredDungeon()
     const int32 Tier = bFromTown ? State->PendingExpeditionTier : 0;
     State->PendingExpedition = NAME_None;
     if (GetWorld()->GetStreamingLevels().Num() > 0) GetWorld()->FlushLevelStreaming();
-    if (auto* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld())) Navigation->Build();
+    if (!IsValid(ExpeditionSite->StandaloneWing))
+        if (auto* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld())) Navigation->Build();
     if (!EnterDungeon(Player, Seed, Tier))
     {
         if (State->LastError.IsEmpty()) State->LastError = TEXT("Could not start the dungeon run");
