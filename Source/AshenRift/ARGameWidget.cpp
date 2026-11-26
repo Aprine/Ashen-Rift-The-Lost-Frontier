@@ -243,11 +243,15 @@ void UARGameWidget::BuildBranchMap()
         if (Room == static_cast<int32>(EARBranchRoom::Exit)) Action->SetBackgroundColor(FLinearColor(.10f, .32f, .43f));
         if (Room == static_cast<int32>(EARBranchRoom::Cache)) Action->SetBackgroundColor(FLinearColor(.27f, .34f, .13f));
         if (Room == static_cast<int32>(EARBranchRoom::Boss)) Action->SetBackgroundColor(FLinearColor(.40f, .20f, .42f));
+        if (Room == static_cast<int32>(EARBranchRoom::DeepExit)) Action->SetBackgroundColor(FLinearColor(.50f, .32f, .09f));
     }
     Text(ModalBody, TEXT(""), 15, Cyan, TEXT("BranchEnemies"));
     Text(ModalBody, TEXT(""), 16, Gold, TEXT("BranchReward"));
     if (OpenBranch->bStandalone)
-        Text(ModalBody, TEXT("可选首领掉落符文饰品。蓝色传送阵随时可以撤离。"), 15, Muted);
+    {
+        Text(ModalBody, TEXT("蓝阵撤离需 3 秒。首领可绕行，击败会掉落符文饰品。"), 15, Muted);
+        Text(ModalBody, TEXT(""), 15, Gold, TEXT("DeepExitStatus"));
+    }
     Text(ModalBody, TEXT("每条连线可往返，点击房间追踪。● 当前  · 已到过  ✓ 威胁已清"), 15, Muted);
     Button(ModalBody, TEXT("关闭路线图 [M / Esc]"), TEXT("Close"));
 }
@@ -370,7 +374,8 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
     const bool bLarge = Screen == EARUIScreen::MainMenu || Screen == EARUIScreen::Camp;
     const bool bSide = Screen == EARUIScreen::Inventory || Screen == EARUIScreen::Shop;
     Dimmer->SetBrushColor(FLinearColor(.003f, .006f, .012f, bSide ? .3f : .7f));
-    const FVector2D Size = bLarge ? FVector2D(1060, 640) : bSide ? FVector2D(500, 660) : FVector2D(640, 600);
+    FVector2D Size = bLarge ? FVector2D(1060, 640) : bSide ? FVector2D(500, 660) : FVector2D(640, 600);
+    if (Screen == EARUIScreen::BranchMap && OpenBranch.IsValid() && OpenBranch->bStandalone) Size.Y = 632;
     auto* ModalSlot = Cast<UCanvasPanelSlot>(Modal->Slot);
     ModalSlot->SetPosition(bSide ? FVector2D(758, 30) : (FVector2D(1280, 720) - Size) * .5f); ModalSlot->SetSize(Size);
     if (Screen == EARUIScreen::MainMenu)
@@ -391,7 +396,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.15 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.16 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -605,7 +610,7 @@ FString UARGameWidget::LabelText(FName Key) const
             if (It->IsNearby(P)) return TEXT("[E] ") + It->Prompt();
         for (TActorIterator<AARExpeditionPassage> It(GetWorld()); It; ++It)
             if (It->CanUse(P)) return FString::Printf(TEXT("[E] %s"), *It->Prompt.ToString());
-        for (TActorIterator<AARPortal> It(GetWorld()); It; ++It) if (FVector::Dist2D(P->GetActorLocation(), It->GetActorLocation()) < 250) return TEXT("[E] 撤离  ·  在蓝色传送阵内停留 3 秒");
+        for (TActorIterator<AARPortal> It(GetWorld()); It; ++It) if (It->IsNearby(P)) return It->Prompt();
         for (TActorIterator<AARExpeditionRouteBoard> It(GetWorld()); It; ++It)
             if (It->CanOpen(P)) return TEXT("[E] 查看路线  ·  补给、精英或撤离");
         return TEXT("[F] 技能  ·  [Q] 药水  ·  [Tab] 背包  ·  [Esc] 暂停");
@@ -681,8 +686,16 @@ FString UARGameWidget::LabelText(FName Key) const
             OpenBranch->LivingEnemies(static_cast<int32>(EARBranchRoom::Elite)),
             OpenBranch->LivingEnemies(static_cast<int32>(EARBranchRoom::Cache)));
         if (OpenBranch->bStandalone)
-            Counts += FString::Printf(TEXT("  /  首领 %d"), OpenBranch->LivingEnemies(static_cast<int32>(EARBranchRoom::Boss)));
+            Counts += FString::Printf(TEXT("  /  首领 %d  /  深层 %d"),
+                OpenBranch->LivingEnemies(static_cast<int32>(EARBranchRoom::Boss)),
+                OpenBranch->LivingEnemies(static_cast<int32>(EARBranchRoom::DeepExit)));
         return Counts;
+    }
+    if (Key == TEXT("DeepExitStatus") && OpenBranch.IsValid())
+    {
+        if (const auto* Portal = OpenBranch->DeepExtractionPortal())
+            return FString::Printf(TEXT("金阵%s  ·  5 秒撤离  ·  额外 %d 枚符文"),
+                Portal->IsSealed() ? TEXT("封印（击败精英）") : TEXT("已解封"), Portal->BonusRunes());
     }
     if (Key == TEXT("BranchReward") && OpenBranch.IsValid())
     {
@@ -712,7 +725,14 @@ FString UARGameWidget::LabelText(FName Key) const
     if (Key == TEXT("ShopPower")) return FString::Printf(TEXT("[2] 攻击 +5  ·  15 金币  ·  剩余 %d"), IsValid(P->ActiveShop) ? 3 - P->ActiveShop->UpgradesSold : 0);
     if (Key == TEXT("ResultTitle")) return S->Phase == EARRunPhase::Settling ? TEXT("正在等待保存") : S->Summary.bSuccess ? TEXT("撤离成功") : TEXT("挑战失败  /  本局物品已失去");
     if (Key == TEXT("ResultMoney")) return FString::Printf(TEXT("获得 %d  ·  花费 %d  ·  带出 %d  ·  损失 %d 金币"), S->Summary.EarnedGold, S->Summary.SpentGold, S->Summary.BankedGold, S->Summary.LostGold);
-    if (Key == TEXT("ResultBank")) return FString::Printf(TEXT("银行：%d 金币 / %d 符文  ·  本局%s符文 %d"), BankGold, BankRunes, S->Summary.bSuccess ? TEXT("带出") : TEXT("损失"), S->Summary.EarnedRunes);
+    if (Key == TEXT("ResultBank"))
+    {
+        FString Line = FString::Printf(TEXT("银行：%d 金币 / %d 符文  ·  本局%s符文 %d"), BankGold, BankRunes,
+            S->Summary.bSuccess ? TEXT("带出") : TEXT("损失"), S->Summary.EarnedRunes);
+        if (S->Summary.ExtractionBonusRunes > 0)
+            Line += FString::Printf(TEXT("  ·  深层奖励 +%d"), S->Summary.ExtractionBonusRunes);
+        return Line;
+    }
     if (Key == TEXT("ResultBoss")) return S->Summary.bBossDefeated ? TEXT("灰烬守望者已击败") : TEXT("灰烬守望者未击败");
     if (Key == TEXT("ResultLoot")) return FString(S->Summary.bSuccess ? TEXT("带出物品\n") : TEXT("损失物品\n")) + ItemList(S->Summary.Loot);
     if (Key == TEXT("ResultHint"))

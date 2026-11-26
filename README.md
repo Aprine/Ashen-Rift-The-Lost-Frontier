@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and Blueprints**. Explore dungeons, collect loot, buy supplies, and choose between extracting safely or pushing deeper for greater rewards and permanent progression.
 
-**Version:** 0.15 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with three authored dungeons and the generated Random Ruins expedition
+**Version:** 0.16 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with three authored dungeons and two extraction routes in the generated Random Ruins
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
@@ -28,7 +28,7 @@ Town preparation → Random Expedition, Random Ruins or practice dungeon → Exp
 - **Three enemy types and one Boss:** Raiders, projectile-firing Hexers, heavy-attacking Sentinels and the Ashen Warden, with readable attack warnings and opportunities to dodge or use cover.
 - **Town and three expeditions:** Choose one of Kuangxin's hand-authored dungeons from the preparation panel. Dungeon 3 has a larger layout with separate merchant and Boss areas. Both areas can be visited within the same run, with the player's health, inventory and run currency carried through each passage.
 - **Random expeditions and difficulty tiers:** Random Expedition draws from the three authored dungeons. The run seed controls the draw, enemy arrangement and equipment drops. In Random Expedition and Random Ruins, extraction at the highest unlocked tier opens the next of three tiers, with stronger enemies and better rewards.
-- **Random Ruins:** Launch from town to explore eight connected rooms generated from the run seed. The route map shows the shop, guarded chest, optional Ashen Warden and blue extraction portal. The Warden drops a guaranteed Runic Charm.
+- **Random Ruins:** Launch from town to explore nine connected rooms generated from the run seed. The route map shows the shop, guarded chest, optional Ashen Warden and two extraction portals. The Warden drops a guaranteed Runic Charm.
 - **Dungeon 3 route board:** Preview the merchant, a seeded elite encounter with a listed equipment drop, or a seeded extraction destination. The board displays health, potions, gold and carried gear. Selecting a route tracks it on the HUD.
 - **Modular branch:** Preview seven interconnected rooms in Dungeon 3. The seed chooses how the rooms connect, and the dungeon assembles their doors and walkable floors on entry. The route map marks visited rooms and cleared threats and previews the elite drop and guarded storeroom reward.
 - **Classic shuffled layouts:** the previous `L_FrontierDungeon` remains playable in Classic mode. Its three editable combat-room Blueprints, Pillars, Barricade and Cross, still change order according to the seed.
@@ -82,6 +82,8 @@ The default map is `/Game/AshenRift/Maps/Map_Hub`. Open the project in UE 4.27.2
 
 Choose a class in the main menu, enter town and press **B** near the spawn to prepare. Select an unlocked difficulty tier and click **随机遗迹** (Random Ruins) to start a generated run. Press **M** to see the full layout and select a room to track on the HUD. Choose **随机出征** (Random Expedition) or press **E** to draw an authored dungeon. The three named dungeon buttons launch practice runs.
 
+In Random Ruins, take the blue portal to extract in three seconds. For a higher payout, defeat the elite to unseal the gold portal, cross the Warden's room and hold the gold portal for five seconds. The Warden can be bypassed. The route map shows whether the portal is sealed and how many bonus runes are at stake.
+
 In Dungeon 3, find the **route board**, press **E**, then press **4** to preview the modular branch. Select a room, follow the HUD to the green passage and press **E** to enter. Press **M** inside to reopen the map. Press **R** at settlement to return to town.
 
 The storeroom connects the elite room to either the merchant room or the exit. Defeat its guard and press **E** at the chest to claim two potions or two runes, as shown on the map.
@@ -125,7 +127,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 
 ## Run and progression rules
 
-- **Extraction:** remain in the blue portal for three seconds. Taking damage or leaving cancels the attempt. Defeating the Boss is optional.
+- **Extraction:** taking damage or leaving either portal cancels the attempt. Completing the gold portal channel banks 2, 3 or 4 additional runes at tiers 1, 2 or 3.
 - **Expedition tiers:** Extracting from Random Expedition or Random Ruins at your highest unlocked tier opens the next tier. A newly unlocked tier is automatically selected for the next departure. Death leaves unlocked tiers available.
 - **Death:** carried items, new loot and unextracted currency are lost. Uncarried stash stock, banked currency and permanent talents remain.
 - **Loadouts:** bring at most one of each equipment type and five potions, with a weapon matching your class. Stock is deducted and saved at departure, not while preparing. Selected equipment is automatically equipped on entry.
@@ -135,7 +137,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 
 ## Validation
 
-The suite covers health, inventory, room seeds, the run loop, progression, navigation, camp management, enemy variants, UI, combat feedback, the three authored expeditions, the modular branch and a complete Random Ruins run. See the [0.15 Random Ruins notes](Docs/21_Random_Ruins.md) for validation results.
+The suite covers health, inventory, room seeds, the run loop, progression, navigation, camp management, enemy variants, UI, combat feedback, the three authored expeditions, the modular branch and both extraction routes in Random Ruins. See the [0.16 deep extraction notes](Docs/22_Deep_Extraction.md) for validation results.
 
 Run the existing suite after building the editor module:
 
@@ -175,6 +177,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 | Topic | Documentation |
 |---|---|
+| Version 0.16 two extraction routes and tiered rune rewards | [Deep extraction](Docs/22_Deep_Extraction.md) |
 | Version 0.15 generated standalone expedition and optional Boss | [Random Ruins](Docs/21_Random_Ruins.md) |
 | Version 0.14 guarded storeroom and live route status | [Storeroom routes](Docs/20_Storeroom_Routes.md) |
 | Version 0.13 generated routes and modular rooms | [Modular branch](Docs/19_Modular_Branch.md) |
@@ -196,7 +199,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 ## Current limitations and next steps
 
 - The integrated environment uses KayKit assets and retains some greybox support geometry. Characters and weapons still use template or simple placeholder visuals. Some scene signs remain in English.
-- Random Ruins uses a fixed set of eight room types. The seed varies their connections and orientation, with the Boss always connected to the elite room. Dungeon 3 also has a seven-room generated wing. The Classic dungeon shuffles combat-room layouts along its fixed route.
+- Random Ruins uses a fixed set of nine room types. The seed varies their connections and orientation, with the deep exit always connected to the Boss room. Dungeon 3 also has a seven-room generated wing. The Classic dungeon shuffles combat-room layouts along its fixed route.
 - Combat animations are basic generated overlays. Damage still uses existing gameplay timing rather than animation-driven hit events.
 - The stash has a fixed item list without item instances, random affixes, crafting or insurance.
 - Sound settings currently provide a session-level on/off toggle. Background music, volume sliders and final mixing remain future work.

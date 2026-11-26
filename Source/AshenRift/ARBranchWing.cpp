@@ -40,7 +40,7 @@ namespace
     }
 }
 
-FARBranchPlan FARBranchPlan::Generate(int32 Seed, bool bIncludeBoss)
+FARBranchPlan FARBranchPlan::Generate(int32 Seed, bool bStandalone)
 {
     FRandomStream Random(Seed ^ 0x1973cd);
     const int32 Fork = Id(EARBranchRoom::Junction);
@@ -62,10 +62,12 @@ FARBranchPlan FARBranchPlan::Generate(int32 Seed, bool bIncludeBoss)
     Plan.Edges = { FIntPoint(Id(EARBranchRoom::Entry), Guard), FIntPoint(Guard, Fork),
         FIntPoint(SupplyParent, Supplies), FIntPoint(Fork, Elite), FIntPoint(ExitParent, Exit),
         FIntPoint(Elite, Cache), FIntPoint(Cache, bCacheToShop ? Supplies : Exit) };
-    if (bIncludeBoss)
+    if (bStandalone)
     {
         Plan.Cells.Add(FIntPoint(2, 0));
         Plan.Edges.Emplace(Elite, Id(EARBranchRoom::Boss));
+        Plan.Cells.Add(FIntPoint(2, bCacheToShop ? -Side : Side));
+        Plan.Edges.Emplace(Id(EARBranchRoom::Boss), Id(EARBranchRoom::DeepExit));
     }
     const FIntPoint Left(-Forward.Y, Forward.X);
     for (FIntPoint& Cell : Plan.Cells)
@@ -145,11 +147,13 @@ AARExpeditionBranchWing::AARExpeditionBranchWing()
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Keg(TEXT("/Game/Environments/KayKitDungeon/Meshes/Props/SM_keg_decorated.SM_keg_decorated"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Chest(TEXT("/Game/Environments/KayKitDungeon/Meshes/Props/SM_chest_gold.SM_chest_gold"));
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> Blue(TEXT("/Game/AshenRift/Materials/M_Portal.M_Portal"));
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> Amber(TEXT("/Game/AshenRift/Materials/M_Gold.M_Gold"));
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> Gold(TEXT("/Game/AshenRift/Materials/M_Trader.M_Trader"));
     FloorMesh = Floor.Object;
     WallMesh = Wall.Object;
     FrameMesh = Frame.Object;
     PortalMaterial = Blue.Object;
+    DeepPortalMaterial = Amber.Object;
     TraderMaterial = Gold.Object;
     RoomStyles.SetNum(Id(EARBranchRoom::Count));
     const auto Prop = [&](EARBranchRoom Room, UStaticMesh* Mesh, float X, float Y, FVector Extent = FVector::ZeroVector)
@@ -173,11 +177,14 @@ AARExpeditionBranchWing::AARExpeditionBranchWing()
     Prop(EARBranchRoom::Cache, Boxes.Object, 595, -620);
     Prop(EARBranchRoom::Boss, Pillar.Object, -720, 690, FVector(90, 85, 180));
     Prop(EARBranchRoom::Boss, Pillar.Object, 720, -690, FVector(90, 85, 180));
+    Prop(EARBranchRoom::DeepExit, Pillar.Object, -630, 650, FVector(76, 76, 175));
+    Prop(EARBranchRoom::DeepExit, Chest.Object, 680, -610);
     RoomStyles[Id(EARBranchRoom::Entry)].Light = FColor(148, 191, 225);
     RoomStyles[Id(EARBranchRoom::Elite)].Light = FColor(245, 132, 105);
     RoomStyles[Id(EARBranchRoom::Exit)].Light = FColor(107, 186, 238);
     RoomStyles[Id(EARBranchRoom::Cache)].Light = FColor(205, 214, 141);
     RoomStyles[Id(EARBranchRoom::Boss)].Light = FColor(248, 144, 88);
+    RoomStyles[Id(EARBranchRoom::DeepExit)].Light = FColor(252, 199, 97);
 }
 
 void AARExpeditionBranchWing::PostLoad()
@@ -234,6 +241,7 @@ FVector AARExpeditionBranchWing::Goal(int32 Room) const
     if (Room == Id(EARBranchRoom::Entry) && IsValid(Return)) return Return->GetActorLocation();
     if (Room == Id(EARBranchRoom::Supplies) && IsValid(Shop)) return Shop->GetActorLocation();
     if (Room == Id(EARBranchRoom::Exit) && IsValid(Exit)) return Exit->GetActorLocation();
+    if (Room == Id(EARBranchRoom::DeepExit) && IsValid(DeepExit)) return DeepExit->GetActorLocation();
     if (Room == Id(EARBranchRoom::Cache) && IsValid(Cache)) return Cache->GetActorLocation();
     return Center(Room);
 }
@@ -251,14 +259,15 @@ float AARExpeditionBranchWing::StartingYaw() const
 
 const TCHAR* AARExpeditionBranchWing::Name(int32 Room)
 {
-    const TCHAR* Names[] = { TEXT("入口"), TEXT("战斗"), TEXT("岔路"), TEXT("补给"), TEXT("精英"), TEXT("撤离"), TEXT("储藏"), TEXT("首领") };
+    const TCHAR* Names[] = { TEXT("入口"), TEXT("战斗"), TEXT("岔路"), TEXT("补给"), TEXT("精英"),
+        TEXT("撤离"), TEXT("储藏"), TEXT("首领"), TEXT("深层撤离") };
     return Room >= 0 && Room < Id(EARBranchRoom::Count) ? Names[Room] : TEXT("随机支路");
 }
 
 bool AARExpeditionBranchWing::IsEncounter(int32 Room)
 {
     return Room == Id(EARBranchRoom::Guard) || Room == Id(EARBranchRoom::Elite) ||
-        Room == Id(EARBranchRoom::Cache) || Room == Id(EARBranchRoom::Boss);
+        Room == Id(EARBranchRoom::Cache) || Room == Id(EARBranchRoom::Boss) || Room == Id(EARBranchRoom::DeepExit);
 }
 
 int32 AARExpeditionBranchWing::LivingEnemies(int32 Room) const
@@ -387,16 +396,24 @@ bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player, int32 Tier)
         CacheAt, Center(Id(EARBranchRoom::Elite)), NAME_None, Tier);
     auto* Boss = bStandalone ? Mode->SpawnExpeditionEnemy(Mode->BossClass.Get(),
         Center(Id(EARBranchRoom::Boss)) + FVector(0, 0, 160), EliteAt, BossReward(), Tier) : nullptr;
-    if (Pending.Num() != Layout.Cells.Num() || (bStandalone ? !Boss : !Return) ||
+    AAREnemy* DeepGuard = nullptr;
+    if (bStandalone)
+    {
+        const FVector DeepSite = Center(Id(EARBranchRoom::DeepExit));
+        DeepExit = World->SpawnActor<AARPortal>(AARPortal::StaticClass(), DeepSite + FVector(0, 0, 15), FRotator::ZeroRotator);
+        DeepGuard = Mode->SpawnExpeditionEnemy(Mode->RangedEnemyClass, DeepSite + FVector(465, 420, 110), DeepSite, NAME_None, Tier);
+    }
+    if (Pending.Num() != Layout.Cells.Num() || (bStandalone ? (!Boss || !DeepExit || !DeepGuard) : !Return) ||
         !Shop || !Exit || !Cache || !Guard || !Hexer || !Elite || !CacheGuard)
     {
         for (AActor* Actor : Pending) Actor->Destroy();
-        AActor* Spawned[] = {Return, Shop, Exit, Cache, Guard, Hexer, Elite, CacheGuard, Boss};
+        AActor* Spawned[] = {Return, Shop, Exit, Cache, Guard, Hexer, Elite, CacheGuard, Boss, DeepExit, DeepGuard};
         for (AActor* Actor : Spawned)
             if (IsValid(Actor)) Actor->Destroy();
         Return = nullptr;
         Shop = nullptr;
         Exit = nullptr;
+        DeepExit = nullptr;
         Cache = nullptr;
         return false;
     }
@@ -417,6 +434,12 @@ bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player, int32 Tier)
     RoomEnemies[Id(EARBranchRoom::Elite)].Add(Elite);
     RoomEnemies[Id(EARBranchRoom::Cache)].Add(CacheGuard);
     if (Boss) RoomEnemies[Id(EARBranchRoom::Boss)].Add(Boss);
+    if (DeepExit)
+    {
+        DeepExit->ConfigureDeep(Elite->Health, Tier);
+        DeepExit->Mesh->SetMaterial(0, DeepPortalMaterial);
+        RoomEnemies[Id(EARBranchRoom::DeepExit)].Add(DeepGuard);
+    }
     bBuilt = true;
     SetActorTickEnabled(true);
     if (auto* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World)) Navigation->Build();

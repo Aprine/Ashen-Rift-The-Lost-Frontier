@@ -7,6 +7,7 @@
 class UARProfile;
 class UARInventoryComponent;
 class AARPlayerCharacter;
+class AARPortal;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FARRunChanged);
 
 UCLASS()
@@ -50,6 +51,7 @@ public:
     bool BuyPotion(UARInventoryComponent* Inventory);
     bool BuyPower(AARPlayerCharacter* Player);
     UFUNCTION(BlueprintCallable, Category="Run") bool BeginExtraction();
+    bool BeginPortalExtraction(const AARPortal& Portal);
     UFUNCTION(BlueprintCallable, Category="Run") void CancelExtraction();
     UFUNCTION(BlueprintCallable, Category="Run") bool SettleRun(bool bSuccess, UARInventoryComponent* Inventory);
     UFUNCTION(BlueprintCallable, Category="Save") bool RetrySave();
@@ -61,6 +63,8 @@ private:
     bool bProfileLoaded = false;
     bool bProfileTransaction = false;
     int32 CampExpeditionTier = 1;
+    int32 PendingExtractionBonus = 0;
+    bool StartExtraction(int32 BonusRunes);
     bool CanManageCamp(AARPlayerCharacter* Player) const;
     bool CommitPendingSave();
     void FinishSettlement();

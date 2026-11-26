@@ -151,6 +151,17 @@ class ASHENRIFT_API AARPortal : public AActor
 public:
     AARPortal();
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) UStaticMeshComponent* Mesh;
+    void ConfigureDeep(UARHealthComponent* EliteHealth, int32 Tier);
+    bool IsNearby(const AARPlayerCharacter* Player) const;
+    bool IsSealed() const { return bSealed; }
+    float ChannelSeconds() const { return IsDeep() ? 5.f : 3.f; }
+    bool IsDeep() const { return RunicBonus > 0; }
+    int32 BonusRunes() const { return RunicBonus; }
+    FString Prompt() const;
+private:
+    UFUNCTION() void Unseal();
+    int32 RunicBonus = 0;
+    bool bSealed = false;
 };
 
 UCLASS()

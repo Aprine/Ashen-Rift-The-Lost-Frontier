@@ -16,6 +16,17 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.16 — 2026-11-27
+
+### Added
+
+- Added a ninth generated room in Random Ruins with a guarded gold extraction portal. Defeating the elite unseals it, and the Ashen Warden can be bypassed en route. The blue portal remains a three-second extraction choice.
+- An uninterrupted five-second gold channel banks 2, 3 or 4 bonus runes at tiers 1, 2 or 3. The route map shows both exits, their conditions and the potential payout. The results screen shows the bonus separately.
+
+### Validation
+
+- Passed all 15 regression tests. Checked 128 seeded layouts and ran both extraction routes in UE4 with seeds 9 and 28, including channel interruptions, a fatal hit and saved rune totals. Development Editor and Game builds, Blueprint compilation and the seven-map WindowsNoEditor cook passed. See the [deep extraction notes](Docs/22_Deep_Extraction.md) for a gameplay screenshot.
+
 ## 0.15 — 2026-11-26
 
 ### Added

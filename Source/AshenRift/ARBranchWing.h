@@ -14,7 +14,7 @@ class UStaticMesh;
 class UStaticMeshComponent;
 class UMaterialInterface;
 
-enum class EARBranchRoom : uint8 { Entry, Guard, Junction, Supplies, Elite, Exit, Cache, Boss, Count };
+enum class EARBranchRoom : uint8 { Entry, Guard, Junction, Supplies, Elite, Exit, Cache, Boss, DeepExit, Count };
 
 // Each edge connects two room indices. The same pair defines a map line and
 // the physical doorway. Cells with a shared edge can be crossed both ways.
@@ -23,7 +23,7 @@ struct FARBranchPlan
     TArray<FIntPoint> Cells;
     TArray<FIntPoint> Edges;
     bool Connects(int32 A, int32 B) const;
-    static FARBranchPlan Generate(int32 Seed, bool bIncludeBoss = false);
+    static FARBranchPlan Generate(int32 Seed, bool bStandalone = false);
 };
 
 USTRUCT()
@@ -93,6 +93,7 @@ public:
     float StartingYaw() const;
     FName EliteReward() const { return Reward; }
     static FName BossReward() { return TEXT("RunicCharm"); }
+    const AARPortal* DeepExtractionPortal() const { return DeepExit; }
     bool CacheHoldsRunes() const { return bCacheRunes; }
     bool WasVisited(int32 Room) const { return Visited.Contains(Room); }
     bool WasCacheClaimed() const;
@@ -103,9 +104,11 @@ public:
 
 private:
     UPROPERTY() UMaterialInterface* PortalMaterial = nullptr;
+    UPROPERTY() UMaterialInterface* DeepPortalMaterial = nullptr;
     UPROPERTY() UMaterialInterface* TraderMaterial = nullptr;
     UPROPERTY() AARExpeditionPassage* Return = nullptr;
     UPROPERTY() AARPortal* Exit = nullptr;
+    UPROPERTY() AARPortal* DeepExit = nullptr;
     UPROPERTY() AARShop* Shop = nullptr;
     UPROPERTY() AARBranchCache* Cache = nullptr;
     FARBranchPlan Layout;

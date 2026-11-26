@@ -93,6 +93,7 @@ bool UARRunGameInstance::BeginExpedition(int32 InSeed, UARInventoryComponent* Lo
     }
     RunGold = RunRunes = 0;
     GoldEarned = GoldSpent = 0;
+    PendingExtractionBonus = 0;
     bBossDefeated = false;
     Seed = InSeed;
     ExpeditionTier = Tier;
@@ -136,7 +137,16 @@ bool UARRunGameInstance::BuyPower(AARPlayerCharacter* Player)
 }
 bool UARRunGameInstance::BeginExtraction()
 {
+    return StartExtraction(0);
+}
+bool UARRunGameInstance::BeginPortalExtraction(const AARPortal& Portal)
+{
+    return !Portal.IsSealed() && StartExtraction(Portal.BonusRunes());
+}
+bool UARRunGameInstance::StartExtraction(int32 BonusRunes)
+{
     if (Phase != EARRunPhase::InDungeon) return false;
+    PendingExtractionBonus = BonusRunes;
     Phase = EARRunPhase::Extracting;
     OnChanged.Broadcast();
     return true;
@@ -144,6 +154,7 @@ bool UARRunGameInstance::BeginExtraction()
 void UARRunGameInstance::CancelExtraction()
 {
     if (Phase != EARRunPhase::Extracting) return;
+    PendingExtractionBonus = 0;
     Phase = EARRunPhase::InDungeon;
     OnChanged.Broadcast();
 }
@@ -160,13 +171,16 @@ bool UARRunGameInstance::SettleRun(bool bSuccess, UARInventoryComponent* Invento
     Summary.bBossDefeated = bBossDefeated;
     Summary.ExpeditionTier = ExpeditionTier;
     Summary.EarnedRunes = RunRunes;
+    Summary.ExtractionBonusRunes = bSuccess ? PendingExtractionBonus : 0;
+    PendingExtractionBonus = 0;
     Summary.BankedGold = bSuccess ? RunGold : 0;
     Summary.LostGold = bSuccess ? 0 : RunGold;
     Summary.Loot = Inventory->Items;
     PendingInventory = Inventory;
     if (!bSuccess) { FinishSettlement(); return true; }
     PendingProfile = DuplicateObject<UARProfile>(Profile, this);
-    if (RunGold > MAX_int32 - Profile->BankGold || RunRunes > MAX_int32 - Profile->BankRunes)
+    const int64 NewBankRunes = static_cast<int64>(Profile->BankRunes) + RunRunes + Summary.ExtractionBonusRunes;
+    if (RunGold > MAX_int32 - Profile->BankGold || NewBankRunes > MAX_int32)
     {
         LastError = TEXT("Bank currency overflow. Settlement remains locked.");
         PendingProfile = nullptr;
@@ -174,7 +188,7 @@ bool UARRunGameInstance::SettleRun(bool bSuccess, UARInventoryComponent* Invento
         return false;
     }
     PendingProfile->BankGold += RunGold;
-    PendingProfile->BankRunes += RunRunes;
+    PendingProfile->BankRunes = static_cast<int32>(NewBankRunes);
     if (ExpeditionTier == Profile->HighestExpeditionTier && ExpeditionTier < MaxExpeditionTier)
         ++PendingProfile->HighestExpeditionTier;
     for (const auto& Pair : Summary.Loot)

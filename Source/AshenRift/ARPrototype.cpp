@@ -222,13 +222,14 @@ void AARPlayerCharacter::Interact()
             if (HUD->GameUI->OpenRouteBoard(*It)) return;
     for (TActorIterator<AARPortal> It(GetWorld()); It; ++It)
     {
-        if (FVector::Dist2D(GetActorLocation(), It->GetActorLocation()) <= 250 && State->BeginExtraction())
-        {
-            ExtractLocation = It->GetActorLocation();
-            ExtractUntil = GetWorld()->GetTimeSeconds() + 3.f;
-            ShowNotice(TEXT("Extracting: stay inside the portal for 3 seconds"));
-            return;
-        }
+        if (!It->IsNearby(this)) continue;
+        if (It->IsSealed()) { ShowNotice(It->Prompt()); return; }
+        ExtractLocation = It->GetActorLocation();
+        ExtractUntil = GetWorld()->GetTimeSeconds() + It->ChannelSeconds();
+        if (State->BeginPortalExtraction(**It))
+            ShowNotice(It->IsDeep() ? TEXT("正在深层撤离 · 请在金色传送阵内停留 5 秒") :
+                TEXT("Extracting: stay inside the portal for 3 seconds"));
+        return;
     }
     ShowNotice(TEXT("Press E near the trader or inside the blue extraction portal"));
 }
@@ -449,6 +450,31 @@ AARPortal::AARPortal()
     Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
+void AARPortal::ConfigureDeep(UARHealthComponent* EliteHealth, int32 Tier)
+{
+    check(IsValid(EliteHealth));
+    RunicBonus = 1 + FMath::Clamp(Tier, 1, UARRunGameInstance::MaxExpeditionTier);
+    bSealed = !EliteHealth->bDead;
+    if (bSealed) EliteHealth->OnDied.AddUniqueDynamic(this, &AARPortal::Unseal);
+}
+
+void AARPortal::Unseal()
+{
+    bSealed = false;
+}
+
+bool AARPortal::IsNearby(const AARPlayerCharacter* Player) const
+{
+    return FVector::DistSquared2D(Player->GetActorLocation(), GetActorLocation()) <= FMath::Square(250.f);
+}
+
+FString AARPortal::Prompt() const
+{
+    if (IsSealed()) return TEXT("金色传送阵已封印 · 击败精英后可用");
+    if (IsDeep()) return FString::Printf(TEXT("[E] 深层撤离 · 停留 5 秒 · 成功额外获得 %d 枚符文"), BonusRunes());
+    return TEXT("[E] 撤离 · 在蓝色传送阵内停留 3 秒");
+}
+
 AARPrototypeGameMode::AARPrototypeGameMode()
 {
     DefaultPawnClass = AARPlayerCharacter::StaticClass();
@@ -543,7 +569,7 @@ bool AARPrototypeGameMode::EnterDungeon(AARPlayerCharacter* Player, int32 Seed, 
     }
     if (GeneratedWing)
     {
-        Player->ShowNotice(TEXT("随机遗迹 · 按 M 查看本局地图，蓝色传送阵可直接撤离。"));
+        Player->ShowNotice(TEXT("随机遗迹 · 按 M 查看路线和两处撤离点。"));
         return true;
     }
     if (ExpeditionSite)
