@@ -101,6 +101,7 @@ void AARPlayerCharacter::SetupPlayerInputComponent(UInputComponent* Input)
     Input->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
     Input->BindAction("Attack", IE_Pressed, this, &AARPlayerCharacter::Attack);
     Input->BindAction("Interact", IE_Pressed, this, &AARPlayerCharacter::Interact);
+    Input->BindAction("BranchMap", IE_Pressed, this, &AARPlayerCharacter::ToggleBranchMap);
     Input->BindAction("Potion", IE_Pressed, this, &AARPlayerCharacter::UsePotion);
     Input->BindAction("Return", IE_Pressed, this, &AARPlayerCharacter::ReturnOrRetry);
     Input->BindAction("Inventory", IE_Pressed, this, &AARPlayerCharacter::ToggleInventory);
@@ -184,7 +185,8 @@ void AARPlayerCharacter::Interact()
     auto* PC = Cast<APlayerController>(Controller);
     auto* HUD = PC ? Cast<AARPrototypeHUD>(PC->GetHUD()) : nullptr;
     if (HUD && HUD->GameUI && HUD->GameUI->IsMenuOpen()) return;
-    if (HUD && HUD->GameUI && HUD->GameUI->CurrentScreen() == EARUIScreen::Routes)
+    if (HUD && HUD->GameUI &&
+        (HUD->GameUI->CurrentScreen() == EARUIScreen::Routes || HUD->GameUI->CurrentScreen() == EARUIScreen::BranchMap))
     {
         HUD->GameUI->CloseRouteBoard();
         return;
@@ -222,6 +224,13 @@ void AARPlayerCharacter::Interact()
         }
     }
     ShowNotice(TEXT("Press E near the trader or inside the blue extraction portal"));
+}
+
+void AARPlayerCharacter::ToggleBranchMap()
+{
+    if (const auto* PC = Cast<APlayerController>(Controller))
+        if (auto* HUD = Cast<AARPrototypeHUD>(PC->GetHUD()))
+            if (HUD->GameUI) HUD->GameUI->ToggleBranchMap();
 }
 float AARPlayerCharacter::ExtractionRemaining() const
 { return FMath::Max(0.f, ExtractUntil - GetWorld()->GetTimeSeconds()); }

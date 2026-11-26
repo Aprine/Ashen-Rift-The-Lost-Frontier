@@ -1,4 +1,5 @@
 #include "ARExpeditionSite.h"
+#include "ARBranchWing.h"
 #include "ARPrototype.h"
 #include "ARRunGameInstance.h"
 #include "Components/SceneComponent.h"
@@ -89,14 +90,16 @@ AARExpeditionPassage::AARExpeditionPassage()
 
 bool AARExpeditionPassage::CanUse(const AARPlayerCharacter* Player) const
 {
-    if (!IsValid(Player) || !IsValid(Destination) || Destination == this) return false;
+    if (!IsValid(Player) || Destination == this ||
+        (!IsValid(Destination) && (!IsValid(BranchWing) || !BranchWing->IsPrepared()))) return false;
     const FVector Delta = Player->GetActorLocation() - GetActorLocation();
     return Delta.SizeSquared2D() <= FMath::Square(175.f) && FMath::Abs(Delta.Z) < 180.f;
 }
 
-bool AARExpeditionPassage::Use(AARPlayerCharacter* Player) const
+bool AARExpeditionPassage::Use(AARPlayerCharacter* Player)
 {
     if (!CanUse(Player)) return false;
+    if (!IsValid(Destination) && (!BranchWing->Build(Player) || !IsValid(Destination))) return false;
     const FVector Arrival = Destination->GetActorTransform().TransformPositionNoScale(Destination->ArrivalOffset);
     const float Yaw = Destination->GetActorRotation().Yaw;
     if (!Player->TeleportTo(Arrival, FRotator(0, Yaw, 0))) return false;
@@ -131,6 +134,7 @@ AARExpeditionRouteBoard::AARExpeditionRouteBoard()
 void AARExpeditionRouteBoard::InitializeRun(int32 Seed, EARPlayerClass PlayerClass)
 {
     if (bReady || !IsValid(ShopPassage) || !IsValid(EntrancePortal) || EliteOffsets.Num() == 0) return;
+    if (IsValid(BranchWing)) BranchWing->Prepare(Seed, PlayerClass);
     FRandomStream Random(Seed ^ 0x5641c9);
     const FTransform Transform = GetActorTransform();
     ElitePosition = Transform.TransformPositionNoScale(EliteOffsets[Random.RandRange(0, EliteOffsets.Num() - 1)]);

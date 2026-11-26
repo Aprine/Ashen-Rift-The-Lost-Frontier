@@ -14,6 +14,22 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.13 — 2026-11-26
+
+### Added
+
+- Added a seeded, six-room modular branch accessible from the route board in Dungeon 3. The shop or exit can branch off the guard room or the junction, giving three connection patterns with rotated and mirrored layouts.
+- Added a clickable map that draws real room connections, marks the current room, previews the elite reward and passes the selected destination to the HUD.
+- Assembled floors, doors, walls and room props from the existing KayKit assets. The branch shares the main dungeon's run state, including the merchant wallet, elite loot, timed extraction and difficulty progression.
+
+### Fixed
+
+- Enabled instanced-mesh usage on the reused KayKit material and set up movable lights in each generated room. Rebuilt Dungeon 3's navigation from the current bounds, including the area reserved for the branch.
+
+### Validation
+
+- Passed all 14 regression tests. Validated deterministic layouts over 128 seeds and checked physical doors, navigation, shopping, elite loot, walking back and extraction with seeds 9, 15 and 28. Seed 9 was verified with real rendering. Development Editor and Game builds, Blueprint compilation and the WindowsNoEditor cook passed.
+
 ## 0.12 — 2026-11-26
 
 ### Added

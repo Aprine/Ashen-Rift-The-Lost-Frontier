@@ -47,6 +47,7 @@ public:
     UPROPERTY() AARShop* ActiveShop = nullptr;
     UFUNCTION(BlueprintCallable) void Attack();
     UFUNCTION(BlueprintCallable) void Interact();
+    void ToggleBranchMap();
     UFUNCTION(BlueprintCallable) void UsePotion();
     UFUNCTION(BlueprintCallable) void ReturnOrRetry();
     UFUNCTION(BlueprintCallable) void ResetForHub();
@@ -167,6 +168,7 @@ public:
     UFUNCTION(BlueprintCallable) bool StartDungeon(AARPlayerCharacter* Player);
     bool DepartTown(AARPlayerCharacter* Player, int32 Destination);
     AAREnemy* SpawnRouteElite(AARPlayerCharacter* Player, FVector Position, FName RewardItem);
+    AAREnemy* SpawnExpeditionEnemy(TSubclassOf<AAREnemy> Class, FVector Position, FVector Facing, FName Drop, int32 Tier);
     bool IsExpeditionTown() const;
     bool ReturnFromExpedition(AARPlayerCharacter* Player);
     FVector CampLocation() const;
@@ -176,7 +178,6 @@ private:
     UPROPERTY() AARExpeditionSite* ExpeditionSite = nullptr;
     void BeginAuthoredDungeon();
     bool EnterDungeon(AARPlayerCharacter* Player, int32 Seed, int32 Tier = 0);
-    AAREnemy* SpawnExpeditionEnemy(TSubclassOf<AAREnemy> Class, FVector Position, FVector Facing, FName Drop, int32 Tier);
 };
 
 UCLASS()

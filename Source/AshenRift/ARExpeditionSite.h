@@ -6,6 +6,7 @@
 #include "ARExpeditionSite.generated.h"
 
 class AARPlayerCharacter;
+class AARExpeditionBranchWing;
 class AAREnemy;
 class AARPortal;
 class UStaticMeshComponent;
@@ -45,11 +46,12 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Passage") UStaticMeshComponent* Mesh;
     UPROPERTY(EditInstanceOnly, Category="Passage") AARExpeditionPassage* Destination = nullptr;
+    UPROPERTY(EditInstanceOnly, Category="Passage") AARExpeditionBranchWing* BranchWing = nullptr;
     UPROPERTY(EditInstanceOnly, Category="Passage") FText Prompt;
     UPROPERTY(EditAnywhere, Category="Passage", meta=(MakeEditWidget)) FVector ArrivalOffset = FVector(210, 0, 102);
 
     bool CanUse(const AARPlayerCharacter* Player) const;
-    bool Use(AARPlayerCharacter* Player) const;
+    bool Use(AARPlayerCharacter* Player);
 };
 
 UENUM()
@@ -64,6 +66,7 @@ public:
 
     UPROPERTY(EditInstanceOnly, Category="Routes") AARExpeditionPassage* ShopPassage = nullptr;
     UPROPERTY(EditInstanceOnly, Category="Routes") AARPortal* EntrancePortal = nullptr;
+    UPROPERTY(EditInstanceOnly, Category="Routes") AARExpeditionBranchWing* BranchWing = nullptr;
     UPROPERTY(EditAnywhere, Category="Routes", meta=(MakeEditWidget)) TArray<FVector> EliteOffsets;
     UPROPERTY(EditAnywhere, Category="Routes", meta=(MakeEditWidget)) TArray<FVector> ExtractionOffsets;
 

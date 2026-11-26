@@ -1,5 +1,6 @@
 ﻿#include "ARGameWidget.h"
 #include "ARPrototype.h"
+#include "ARBranchWing.h"
 #include "ARProgression.h"
 #include "AREnemyVariants.h"
 #include "ARDungeon.h"
@@ -66,6 +67,22 @@ namespace
             Player, Player->GetActorLocation(), Goal, Player);
         return Path && Path->IsValid() && !Path->IsPartial() ? Path : nullptr;
     }
+
+    FString DescribeGuidance(AARPlayerCharacter* Player, const FVector& Goal, const TCHAR* Name)
+    {
+        const FVector From = Player->GetActorLocation();
+        if (FVector::DistSquared2D(From, Goal) < FMath::Square(210.f))
+            return FString::Printf(TEXT("%s · 已接近目的地"), Name);
+        const auto* Path = FindRoutePath(Player, Goal);
+        if (!Path) return FString();
+        FVector Step = Goal;
+        for (const FVector& Corner : Path->PathPoints)
+            if (FVector::DistSquared2D(Corner, From) > FMath::Square(110.f)) { Step = Corner; break; }
+        const float Bearing = FMath::FindDeltaAngleDegrees(Player->GetControlRotation().Yaw, (Step - From).Rotation().Yaw);
+        const TCHAR* Direction = FMath::Abs(Bearing) <= 44.f ? TEXT("前方") :
+            FMath::Abs(Bearing) >= 136.f ? TEXT("后方") : Bearing > 0 ? TEXT("右侧") : TEXT("左侧");
+        return FString::Printf(TEXT("%s · %s · 步行约 %d 米"), Name, Direction, FMath::RoundToInt(Path->GetPathLength() / 100.f));
+    }
 }
 void UARActionButton::InvokeAction() { if (IsValid(Screen)) Screen->ExecuteAction(Action, Payload); }
 AARPlayerCharacter* UARGameWidget::Player() const { return Cast<AARPlayerCharacter>(GetOwningPlayerPawn()); }
@@ -73,7 +90,7 @@ UARRunGameInstance* UARGameWidget::Run() const { return Cast<UARRunGameInstance>
 bool UARGameWidget::BlocksGameplayInput() const
 {
     auto* P = Player(); auto* S = Run();
-    return bMainMenu || bPaused || OpenBoard.IsValid() ||
+    return bMainMenu || bPaused || OpenBoard.IsValid() || OpenBranch.IsValid() ||
         (S && (S->Phase == EARRunPhase::Result || S->Phase == EARRunPhase::Settling)) ||
         (P && (P->bCampOpen || P->bInventoryVisible || P->bShopOpen));
 }
@@ -98,9 +115,34 @@ bool UARGameWidget::OpenRouteBoard(AARExpeditionRouteBoard* Board)
 
 void UARGameWidget::CloseRouteBoard()
 {
-    if (!OpenBoard.IsValid()) return;
+    if (!OpenBoard.IsValid() && !OpenBranch.IsValid()) return;
     OpenBoard.Reset();
+    OpenBranch.Reset();
     Refresh();
+}
+
+bool UARGameWidget::ToggleBranchMap()
+{
+    if (View == EARUIScreen::BranchMap)
+    {
+        CloseRouteBoard();
+        return true;
+    }
+    auto* P = Player();
+    auto* S = Run();
+    if (!P || !S || S->Phase != EARRunPhase::InDungeon || (View != EARUIScreen::Game && View != EARUIScreen::Routes))
+        return false;
+    for (TActorIterator<AARExpeditionRouteBoard> It(GetWorld()); It; ++It)
+    {
+        auto* Wing = It->BranchWing;
+        if (!IsValid(Wing) || !Wing->IsPrepared() || !IsValid(Wing->Entrance) ||
+            (!It->CanOpen(P) && !Wing->Entrance->CanUse(P) && Wing->RoomAt(P->GetActorLocation()) == INDEX_NONE)) continue;
+        OpenBoard.Reset();
+        OpenBranch = Wing;
+        Refresh();
+        return true;
+    }
+    return false;
 }
 
 void UARGameWidget::UpdateRouteGuidance(AARPlayerCharacter* P, const UARRunGameInstance* State)
@@ -116,31 +158,79 @@ void UARGameWidget::UpdateRouteGuidance(AARPlayerCharacter* P, const UARRunGameI
     RouteGuidance.Reset();
     for (TActorIterator<AARExpeditionRouteBoard> It(GetWorld()); It; ++It)
     {
+        const auto* Wing = It->BranchWing;
+        if (IsValid(Wing) && Wing->IsPrepared())
+        {
+            if (Wing->RoomAt(P->GetActorLocation()) != INDEX_NONE)
+            {
+                if (TrackedBranchRoom != INDEX_NONE)
+                    RouteGuidance = DescribeGuidance(P, Wing->Goal(TrackedBranchRoom), Wing->Name(TrackedBranchRoom));
+                if (RouteGuidance.IsEmpty()) RouteGuidance = TEXT("随机支路 · [M] 查看本局路线图");
+                else RouteGuidance += TEXT("  ·  [M] 路线图");
+                return;
+            }
+            if (TrackedBranchRoom != INDEX_NONE && IsValid(Wing->Entrance))
+            {
+                RouteGuidance = DescribeGuidance(P, Wing->Entrance->GetActorLocation(), TEXT("随机支路入口"));
+                return;
+            }
+        }
         if (TrackedRoute == EARExpeditionRoute::Elite && It->HasClearedElite())
         {
             RouteGuidance = TEXT("精英已击败 · 拾取掉落后可回路线牌或前往撤离点");
             return;
         }
-        const FVector From = P->GetActorLocation();
-        const FVector Goal = It->Target(TrackedRoute);
-        const float Distance = FVector::Dist2D(From, Goal);
-        if (Distance < 210.f)
-        {
-            RouteGuidance = FString::Printf(TEXT("%s · 已接近目的地"), RouteName(TrackedRoute));
-            return;
-        }
-        const auto* Path = FindRoutePath(P, Goal);
-        if (!Path) return;
-        FVector Step = Goal;
-        for (const FVector& Corner : Path->PathPoints)
-            if (FVector::DistSquared2D(Corner, From) > FMath::Square(110.f)) { Step = Corner; break; }
-        const float Bearing = FMath::FindDeltaAngleDegrees(P->GetControlRotation().Yaw, (Step - From).Rotation().Yaw);
-        const TCHAR* Direction = FMath::Abs(Bearing) <= 44.f ? TEXT("前方") :
-            FMath::Abs(Bearing) >= 136.f ? TEXT("后方") : Bearing > 0 ? TEXT("右侧") : TEXT("左侧");
-        RouteGuidance = FString::Printf(TEXT("%s · %s · 步行约 %d 米"), RouteName(TrackedRoute), Direction,
-            FMath::RoundToInt(Path->GetPathLength() / 100.f));
+        RouteGuidance = DescribeGuidance(P, It->Target(TrackedRoute), RouteName(TrackedRoute));
         return;
     }
+}
+
+void UARGameWidget::BuildBranchMap()
+{
+    if (!OpenBranch.IsValid()) return;
+    const auto& Plan = OpenBranch->Plan();
+    Text(ModalBody, TEXT("本局路线图"), 30, Gold);
+    Text(ModalBody, TEXT(""), 17, Cyan, TEXT("RouteStatus"));
+    Text(ModalBody, TEXT(""), 15, Muted, TEXT("RouteCargo"));
+    auto* Sizing = WidgetTree->ConstructWidget<USizeBox>();
+    Sizing->SetHeightOverride(284);
+    ModalBody->AddChild(Sizing);
+    auto* Map = WidgetTree->ConstructWidget<UCanvasPanel>();
+    Sizing->AddChild(Map);
+    FIntPoint Min = Plan.Cells[0], Max = Plan.Cells[0];
+    for (const FIntPoint& Cell : Plan.Cells)
+    {
+        Min.X = FMath::Min(Min.X, Cell.X);
+        Min.Y = FMath::Min(Min.Y, Cell.Y);
+        Max.X = FMath::Max(Max.X, Cell.X);
+        Max.Y = FMath::Max(Max.Y, Cell.Y);
+    }
+    const auto Position = [&](int32 Room)
+    {
+        const FIntPoint Cell = Plan.Cells[Room];
+        return FVector2D(304 + (Cell.X - (Min.X + Max.X) * .5f) * 134,
+            141 - (Cell.Y - (Min.Y + Max.Y) * .5f) * 65);
+    };
+    for (const FIntPoint& Edge : Plan.Edges)
+    {
+        const FVector2D A = Position(Edge.X), B = Position(Edge.Y);
+        const FVector2D Size(FMath::Abs(A.X - B.X) + 4, FMath::Abs(A.Y - B.Y) + 4);
+        Panel(Map, FVector2D(FMath::Min(A.X, B.X) - 2, FMath::Min(A.Y, B.Y) - 2), Size,
+            FLinearColor(.33f, .45f, .52f))->SetVisibility(ESlateVisibility::HitTestInvisible);
+    }
+    for (int32 Room = 0; Room < Plan.Cells.Num(); ++Room)
+    {
+        auto* Node = Panel(Map, Position(Room) - FVector2D(53, 25), FVector2D(106, 50), Ink);
+        Node->SetPadding(FMargin(0));
+        auto* Body = WidgetTree->ConstructWidget<UVerticalBox>();
+        Node->AddChild(Body);
+        auto* Action = Button(Body, TEXT(""), TEXT("TrackBranchRoom"), Room, FName(*FString::Printf(TEXT("BranchNode%d"), Room)));
+        if (Room == static_cast<int32>(EARBranchRoom::Elite)) Action->SetBackgroundColor(FLinearColor(.45f, .16f, .12f));
+        if (Room == static_cast<int32>(EARBranchRoom::Exit)) Action->SetBackgroundColor(FLinearColor(.10f, .32f, .43f));
+    }
+    Text(ModalBody, FString::Printf(TEXT("精英掉落：%s  ·  补给可购买药水和攻击强化"), *ItemName(OpenBranch->EliteReward())), 16, Gold);
+    Text(ModalBody, TEXT("连线可双向通行，相邻房间中心相距 20 米。点击房间后由 HUD 指路。"), 15, Muted);
+    Button(ModalBody, TEXT("关闭路线图 [M / Esc]"), TEXT("Close"));
 }
 
 UTextBlock* UARGameWidget::Text(UPanelWidget* Parent, const FString& Value, int32 Size, FLinearColor Color, FName Key)
@@ -282,7 +372,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.12 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.13 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -348,9 +438,12 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Text(ModalBody, TEXT(""), 16, Muted, TEXT("RouteElite"));
         Button(ModalBody, TEXT("撤离路线 [3]"), TEXT("TrackRoute"), static_cast<int32>(EARExpeditionRoute::Extract));
         Text(ModalBody, TEXT(""), 16, Muted, TEXT("RouteExtract"));
+        if (OpenBoard.IsValid() && IsValid(OpenBoard->BranchWing) && OpenBoard->BranchWing->IsPrepared())
+            Button(ModalBody, TEXT("预览随机支路 [4]"), TEXT("BranchMap"));
         Gap(ModalBody, 12);
         Button(ModalBody, TEXT("关闭路线牌 [E / Esc]"), TEXT("Close"));
     }
+    else if (Screen == EARUIScreen::BranchMap) BuildBranchMap();
     else if (Screen == EARUIScreen::Inventory)
     {
         Text(ModalBody, TEXT("装备与背包"), 28, Gold);
@@ -426,10 +519,12 @@ void UARGameWidget::Refresh()
     if (bPaused && (S->Phase == EARRunPhase::Result || S->Phase == EARRunPhase::Settling))
     { bPaused = false; UGameplayStatics::SetGamePaused(this, false); }
     if (OpenBoard.IsValid() && !OpenBoard->CanOpen(P)) OpenBoard.Reset();
+    if (S->Phase != EARRunPhase::InDungeon) OpenBranch.Reset();
     UpdateRouteGuidance(P, S);
     const EARUIScreen Desired = S->Phase == EARRunPhase::Result || S->Phase == EARRunPhase::Settling ? EARUIScreen::Result :
         bMainMenu ? EARUIScreen::MainMenu : bPaused ? EARUIScreen::Pause : P->bCampOpen ? EARUIScreen::Camp :
-        OpenBoard.IsValid() ? EARUIScreen::Routes : P->bShopOpen ? EARUIScreen::Shop : P->bInventoryVisible ? EARUIScreen::Inventory : EARUIScreen::Game;
+        OpenBranch.IsValid() ? EARUIScreen::BranchMap : OpenBoard.IsValid() ? EARUIScreen::Routes :
+        P->bShopOpen ? EARUIScreen::Shop : P->bInventoryVisible ? EARUIScreen::Inventory : EARUIScreen::Game;
     if (View != Desired) BuildScreen(Desired);
     for (const auto& Pair : Labels)
     {
@@ -548,6 +643,12 @@ FString UARGameWidget::LabelText(FName Key) const
     }
     if (Key == TEXT("RouteExtract"))
         return RouteDistances.FindRef(Key) + TEXT(" · 蓝色传送阵 · 停留 3 秒带出当前战利品");
+    if (K.StartsWith(TEXT("BranchNode")) && OpenBranch.IsValid())
+    {
+        const int32 Room = FCString::Atoi(*K.Mid(10));
+        return FString::Printf(TEXT("%s%s"), OpenBranch->RoomAt(P->GetActorLocation()) == Room ? TEXT("● ") : TEXT(""),
+            OpenBranch->Name(Room));
+    }
     if (Key == TEXT("VitalityLabel") || Key == TEXT("MightLabel"))
     {
         const bool Vitality = Key == TEXT("VitalityLabel"); const FName Talent = Vitality ? FName(TEXT("Vitality")) : FName(TEXT("Might"));
@@ -615,9 +716,20 @@ bool UARGameWidget::ExecuteAction(FName Action, int32 Payload)
         if (Done)
         {
             TrackedRoute = Route;
+            TrackedBranchRoom = INDEX_NONE;
             NextRouteUpdate = 0;
             OpenBoard.Reset();
         }
+    }
+    else if (Action == TEXT("BranchMap") && View == EARUIScreen::Routes)
+        return ToggleBranchMap();
+    else if (Action == TEXT("TrackBranchRoom") && View == EARUIScreen::BranchMap && OpenBranch.IsValid() &&
+        OpenBranch->Plan().Cells.IsValidIndex(Payload))
+    {
+        TrackedBranchRoom = Payload;
+        NextRouteUpdate = 0;
+        OpenBranch.Reset();
+        Done = true;
     }
     else if ((Action == TEXT("PreparePlus") || Action == TEXT("PrepareMinus")) && View == EARUIScreen::Camp && Payload >= 0 && Payload < 5)
     {
@@ -645,7 +757,7 @@ bool UARGameWidget::ExecuteAction(FName Action, int32 Payload)
         if (View == EARUIScreen::Camp) { P->bCampOpen = false; Done = true; }
         if (View == EARUIScreen::Inventory) { P->bInventoryVisible = false; Done = true; }
         if (View == EARUIScreen::Shop) { P->bShopOpen = false; P->ActiveShop = nullptr; Done = true; }
-        if (View == EARUIScreen::Routes) { OpenBoard.Reset(); Done = true; }
+        if (View == EARUIScreen::Routes || View == EARUIScreen::BranchMap) { CloseRouteBoard(); Done = true; }
     }
     else if (Action == TEXT("Return") && View == EARUIScreen::Result)
     { P->ReturnOrRetry(); Done = S->Phase != EARRunPhase::Settling; }
@@ -676,7 +788,8 @@ FReply UARGameWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent
     if (Key == EKeys::Escape)
     {
         if (View == EARUIScreen::Pause) ExecuteAction(TEXT("Resume"));
-        else if (View == EARUIScreen::Camp || View == EARUIScreen::Shop || View == EARUIScreen::Inventory || View == EARUIScreen::Routes) ExecuteAction(TEXT("Close"));
+        else if (View == EARUIScreen::Camp || View == EARUIScreen::Shop || View == EARUIScreen::Inventory ||
+            View == EARUIScreen::Routes || View == EARUIScreen::BranchMap) ExecuteAction(TEXT("Close"));
         else if (View == EARUIScreen::Game) TogglePause();
         return FReply::Handled();
     }
@@ -703,6 +816,12 @@ FReply UARGameWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent
         else if (Key == EKeys::One) ExecuteAction(TEXT("TrackRoute"), 1);
         else if (Key == EKeys::Two) ExecuteAction(TEXT("TrackRoute"), 2);
         else if (Key == EKeys::Three) ExecuteAction(TEXT("TrackRoute"), 3);
+        else if (Key == EKeys::Four || Key == EKeys::M) ExecuteAction(TEXT("BranchMap"));
+        return FReply::Handled();
+    }
+    if (View == EARUIScreen::BranchMap)
+    {
+        if (Key == EKeys::M || Key == EKeys::E) ExecuteAction(TEXT("Close"));
         return FReply::Handled();
     }
     if (View == EARUIScreen::Inventory)

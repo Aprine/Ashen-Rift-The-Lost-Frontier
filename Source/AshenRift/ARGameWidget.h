@@ -13,6 +13,7 @@ class UProgressBar;
 class UPanelWidget;
 class AARPlayerCharacter;
 class AARExpeditionRouteBoard;
+class AARExpeditionBranchWing;
 class UARRunGameInstance;
 enum class EARExpeditionRoute : uint8;
 
@@ -28,7 +29,7 @@ public:
 };
 
 UENUM(BlueprintType)
-enum class EARUIScreen : uint8 { Game, MainMenu, Pause, Camp, Inventory, Shop, Result, Routes };
+enum class EARUIScreen : uint8 { Game, MainMenu, Pause, Camp, Inventory, Shop, Result, Routes, BranchMap };
 
 UCLASS(Blueprintable)
 class ASHENRIFT_API UARGameWidget : public UUserWidget
@@ -47,6 +48,7 @@ public:
     UFUNCTION(BlueprintPure) EARUIScreen CurrentScreen() const { return View; }
     bool BlocksGameplayInput() const;
     bool OpenRouteBoard(AARExpeditionRouteBoard* Board);
+    bool ToggleBranchMap();
     void CloseRouteBoard();
     bool IsMenuOpen() const { return bMainMenu || bPaused; }
     void InitializeMenu(bool bShow) { bMainMenu = bShow; }
@@ -74,11 +76,14 @@ private:
     bool bMainMenu = true;
     bool bPaused = false;
     TWeakObjectPtr<AARExpeditionRouteBoard> OpenBoard;
+    TWeakObjectPtr<AARExpeditionBranchWing> OpenBranch;
     EARExpeditionRoute TrackedRoute{};
+    int32 TrackedBranchRoom = INDEX_NONE;
     TMap<FName, FString> RouteDistances;
     FString RouteGuidance;
     float NextRouteUpdate = 0.f;
     void BuildRoot();
+    void BuildBranchMap();
     void UpdateRouteGuidance(AARPlayerCharacter* P, const UARRunGameInstance* State);
     void BuildScreen(EARUIScreen Screen);
     void ApplyInputMode();
