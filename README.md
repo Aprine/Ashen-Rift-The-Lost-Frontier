@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and Blueprints**. Explore dungeons, collect loot, buy supplies, and choose between extracting safely or pushing deeper for greater rewards and permanent progression.
 
-**Version:** 0.11 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with a town and three expedition maps
+**Version:** 0.12 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with seeded expeditions and a branching route in Dungeon 3
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
@@ -12,14 +12,14 @@ A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and 
 
 ## The central decision
 
-Every run asks how much you are willing to risk. Pick one of three dungeons from town. Spending run gold on potions and temporary damage upgrades can improve your chances against later enemies, but leaves less gold to extract. You can return to the extraction portal to save your loot or press on toward the elite and the Ashen Warden for more rewards.
+Every run asks how much you are willing to risk. Start a random expedition from town or choose a dungeon for practice. Spending run gold on potions and temporary damage upgrades can improve your chances against later enemies, but leaves less gold to extract. You can return to the extraction portal to save your loot or press on toward the elite and the Ashen Warden for more rewards.
 
 Successful extraction stores remaining items and currency. Runes purchase permanent talents, and stored equipment can be taken into later runs. Bringing stronger gear helps you fight, but that gear is also lost if you die before extracting. Uncarried stash items, banked currency and purchased talents remain safe.
 
 ```text
-Town preparation → Choose Dungeon 1, 2 or 3 → Explore and collect loot
-                                                ├─ Extract → Save loot → Return to town
-                                                └─ Continue → Elite and Boss → Return to extract
+Town preparation → Random expedition or manual dungeon → Explore and collect loot
+                                                          ├─ Supplies or elite → Continue exploring
+                                                          └─ Extract → Save loot → Return to town
 ```
 
 ## Features
@@ -27,6 +27,8 @@ Town preparation → Choose Dungeon 1, 2 or 3 → Explore and collect loot
 - **Two classes:** a melee Warrior with Whirlwind and a ranged Mage with mana-based spells and Arcane Burst.
 - **Three enemy types and one Boss:** Raiders, projectile-firing Hexers, heavy-attacking Sentinels and the Ashen Warden, with readable attack warnings and opportunities to dodge or use cover.
 - **Town and three expeditions:** Choose one of Kuangxin's hand-authored dungeons from the preparation panel. Dungeon 3 has a larger layout with separate merchant and Boss areas. Both areas can be visited within the same run, with the player's health, inventory and run currency carried through each passage.
+- **Random expeditions and difficulty tiers:** A run seed selects the dungeon, enemy arrangement and equipment drops. Extraction at the highest unlocked tier opens the next of three tiers, with stronger enemies and better rewards.
+- **Dungeon 3 route board:** Preview the merchant, a seeded elite encounter with a listed equipment drop, or a seeded extraction destination. The board displays health, potions, gold and carried gear. Selecting a route tracks it on the HUD.
 - **Classic shuffled layouts:** the previous `L_FrontierDungeon` remains playable in Classic mode. Its three editable combat-room Blueprints, Pillars, Barricade and Cross, still change order according to the seed.
 - **Equipment and economy:** weapon, armour and charm slots, drops, potions, limited shop stock and temporary damage upgrades.
 - **Persistent progression:** shared Vitality and Might talents, item storage and camp loadout preparation.
@@ -76,7 +78,7 @@ $ueRoot = 'D:\Epic Games\UE_4.27'
 
 The default map is `/Game/AshenRift/Maps/Map_Hub`. Open the project in UE 4.27.2 to edit it, or use the standalone script above for cross-map gameplay. Pass `-Classic` to the play script to start `/Game/AshenRift/Maps/L_FrontierDungeon`. The earlier greybox remains available at `/Game/AshenRift/Maps/L_RandomDungeon`.
 
-Choose a class in the main menu, enter town, prepare equipment or buy talents, then click **Dungeon 1**, **Dungeon 2** or **Dungeon 3** in the preparation panel. **E** departs for Dungeon 1. In Dungeon 3, press **E** near the marked gold or purple passage to visit the merchant or Boss area, then use the return passage to head back to the blue extraction portal near the start. Press **R** at settlement to return to town.
+Choose a class in the main menu, enter town and press **B** near the spawn to prepare. Select an unlocked difficulty tier and choose **Random expedition** or press **E**. The three named dungeon buttons launch practice runs. In Dungeon 3, follow the HUD to the **route board** and press **E** to see the three options. The gold passage still leads to the merchant and the purple passage leads to the Boss. Press **R** at settlement to return to town.
 
 To compile the Development game target:
 
@@ -95,8 +97,9 @@ The play script uses your local Unreal installation. The Development game execut
 | Basic attack / Mage projectile | Left mouse button |
 | Class skill | F |
 | Use a potion | Q |
-| Interact, trade, use a passage, depart for Dungeon 1 or extract | E |
-| Depart for Dungeon 2 or 3 | Dungeon 2 or 3 button in town preparation |
+| Interact, trade, view routes, start a random expedition or extract | E |
+| Select an expedition tier or launch a practice dungeon | Difficulty or dungeon buttons in town preparation |
+| Track supplies / elite / extraction | 1 / 2 / 3 or click the route board |
 | Open inventory | Tab |
 | Equip or unequip weapon / armour / charm | Z / X / C |
 | Open camp preparation | B, while near camp |
@@ -108,13 +111,14 @@ The play script uses your local Unreal installation. The Development game execut
 | Close a panel, or pause / resume | Esc |
 | Toggle sound effects | Main-menu or pause-menu button |
 
-Inventory and trading **do not pause combat**. Opening a panel displays the cursor and blocks movement, camera and attack input. The dedicated pause menu freezes the game world, cooldowns and extraction progress.
+Combat continues while the inventory, trader or route board is open. Opening a panel displays the cursor and blocks movement, camera and attack input. The dedicated pause menu freezes the game world, cooldowns and extraction progress.
 
 In editor Play-in-Editor sessions, Esc may stop play instead of opening the pause menu. Use the standalone window to check pause behaviour; Shift + F1 releases the editor mouse cursor.
 
 ## Run and progression rules
 
 - **Extraction:** remain in the blue portal for three seconds. Taking damage or leaving cancels the attempt. Defeating the Boss is optional.
+- **Expedition tiers:** only a successful random expedition at your highest unlocked tier opens the next tier. A newly unlocked tier is automatically selected for the next departure. Death leaves unlocked tiers available.
 - **Death:** carried items, new loot and unextracted currency are lost. Uncarried stash stock, banked currency and permanent talents remain.
 - **Loadouts:** bring at most one of each equipment type and five potions, with a weapon matching your class. Stock is deducted and saved at departure, not while preparing. Selected equipment is automatically equipped on entry.
 - **Talents:** Vitality adds maximum health and Might adds damage. Both have three ranks, are shared by the classes and cost banked runes.
@@ -123,7 +127,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 
 ## Validation
 
-The suite covers health, inventory, room seeds, the run loop, progression, dungeon navigation, camp management, enemy variants, UI, combat feedback and travel from town into all three expeditions. Check the [0.11 integration notes](Docs/17_Dungeon_Three.md) for the latest run results.
+The suite covers health, inventory, room seeds, the run loop, progression, dungeon navigation, camp management, enemy variants, UI, combat feedback, all three expeditions and the new route and tier progression. See the [0.12 expedition notes](Docs/18_Random_Expeditions.md) for the latest run results.
 
 Run the existing suite after building the editor module:
 
@@ -163,6 +167,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 | Topic | Documentation |
 |---|---|
+| Version 0.12 random expeditions, tiers and route board | [Random expeditions and routes](Docs/18_Random_Expeditions.md) |
 | Version 0.11 Dungeon 3, merchant and Boss areas | [Dungeon 3 integration](Docs/17_Dungeon_Three.md) |
 | Version 0.10 town, two expeditions and new screenshots | [Town and expeditions](Docs/16_Town_Expeditions.md) |
 | Version 0.9 teammate environment integration | [Map integration](Docs/15_Team_Map_Integration.md) |
@@ -180,7 +185,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 ## Current limitations and next steps
 
 - The integrated environment uses KayKit assets and retains some greybox support geometry. Characters and weapons still use template or simple placeholder visuals. Some scene signs remain in English.
-- All three expedition maps have authored routes and fixed encounter locations. The Classic dungeon shuffles combat-room layouts along its fixed route.
+- All three expeditions use authored layouts. Seeds vary the selected map, enemy placements among authored encounter points and the active nodes in Dungeon 3. The Classic dungeon shuffles combat-room layouts along its fixed route.
 - Combat animations are basic generated overlays. Damage still uses existing gameplay timing rather than animation-driven hit events.
 - The stash has a fixed item list without item instances, random affixes, crafting or insurance.
 - Sound settings currently provide a session-level on/off toggle. Background music, volume sliders and final mixing remain future work.

@@ -32,6 +32,8 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "NavigationPath.h"
+#include "NavigationSystem.h"
 #include "EngineUtils.h"
 #include "InputCoreTypes.h"
 
@@ -46,6 +48,24 @@ namespace
     const FLinearColor Muted(.63f, .69f, .75f);
     const FLinearColor Cyan(.36f, .76f, .86f);
     const FLinearColor Ink(.018f, .027f, .041f, .97f);
+
+    const TCHAR* RouteName(EARExpeditionRoute Route)
+    {
+        switch (Route)
+        {
+        case EARExpeditionRoute::Supplies: return TEXT("补给路线");
+        case EARExpeditionRoute::Elite: return TEXT("精英路线");
+        case EARExpeditionRoute::Extract: return TEXT("撤离路线");
+        default: return TEXT("路线牌");
+        }
+    }
+
+    const UNavigationPath* FindRoutePath(AARPlayerCharacter* Player, const FVector& Goal)
+    {
+        const auto* Path = UNavigationSystemV1::FindPathToLocationSynchronously(
+            Player, Player->GetActorLocation(), Goal, Player);
+        return Path && Path->IsValid() && !Path->IsPartial() ? Path : nullptr;
+    }
 }
 void UARActionButton::InvokeAction() { if (IsValid(Screen)) Screen->ExecuteAction(Action, Payload); }
 AARPlayerCharacter* UARGameWidget::Player() const { return Cast<AARPlayerCharacter>(GetOwningPlayerPawn()); }
@@ -53,8 +73,74 @@ UARRunGameInstance* UARGameWidget::Run() const { return Cast<UARRunGameInstance>
 bool UARGameWidget::BlocksGameplayInput() const
 {
     auto* P = Player(); auto* S = Run();
-    return bMainMenu || bPaused || (S && (S->Phase == EARRunPhase::Result || S->Phase == EARRunPhase::Settling)) ||
+    return bMainMenu || bPaused || OpenBoard.IsValid() ||
+        (S && (S->Phase == EARRunPhase::Result || S->Phase == EARRunPhase::Settling)) ||
         (P && (P->bCampOpen || P->bInventoryVisible || P->bShopOpen));
+}
+
+bool UARGameWidget::OpenRouteBoard(AARExpeditionRouteBoard* Board)
+{
+    auto* P = Player();
+    if (View != EARUIScreen::Game || !IsValid(Board) || !Board->CanOpen(P)) return false;
+    OpenBoard = Board;
+    RouteDistances.Reset();
+    const FName Keys[] = { TEXT("RouteSupplies"), TEXT("RouteElite"), TEXT("RouteExtract") };
+    for (int32 Index = 0; Index < UE_ARRAY_COUNT(Keys); ++Index)
+    {
+        const FVector Goal = Board->Target(static_cast<EARExpeditionRoute>(Index + 1));
+        const auto* Path = FindRoutePath(P, Goal);
+        const float Distance = Path ? Path->GetPathLength() : FVector::Dist2D(P->GetActorLocation(), Goal);
+        RouteDistances.Add(Keys[Index], FString::Printf(TEXT("%s约 %d 米"), Path ? TEXT("步行") : TEXT("直线"), FMath::RoundToInt(Distance / 100.f)));
+    }
+    Refresh();
+    return true;
+}
+
+void UARGameWidget::CloseRouteBoard()
+{
+    if (!OpenBoard.IsValid()) return;
+    OpenBoard.Reset();
+    Refresh();
+}
+
+void UARGameWidget::UpdateRouteGuidance(AARPlayerCharacter* P, const UARRunGameInstance* State)
+{
+    if (State->Phase != EARRunPhase::InDungeon)
+    {
+        RouteGuidance.Reset();
+        return;
+    }
+    const float Now = GetWorld()->GetTimeSeconds();
+    if (Now < NextRouteUpdate) return;
+    NextRouteUpdate = Now + .45f;
+    RouteGuidance.Reset();
+    for (TActorIterator<AARExpeditionRouteBoard> It(GetWorld()); It; ++It)
+    {
+        if (TrackedRoute == EARExpeditionRoute::Elite && It->HasClearedElite())
+        {
+            RouteGuidance = TEXT("精英已击败 · 拾取掉落后可回路线牌或前往撤离点");
+            return;
+        }
+        const FVector From = P->GetActorLocation();
+        const FVector Goal = It->Target(TrackedRoute);
+        const float Distance = FVector::Dist2D(From, Goal);
+        if (Distance < 210.f)
+        {
+            RouteGuidance = FString::Printf(TEXT("%s · 已接近目的地"), RouteName(TrackedRoute));
+            return;
+        }
+        const auto* Path = FindRoutePath(P, Goal);
+        if (!Path) return;
+        FVector Step = Goal;
+        for (const FVector& Corner : Path->PathPoints)
+            if (FVector::DistSquared2D(Corner, From) > FMath::Square(110.f)) { Step = Corner; break; }
+        const float Bearing = FMath::FindDeltaAngleDegrees(P->GetControlRotation().Yaw, (Step - From).Rotation().Yaw);
+        const TCHAR* Direction = FMath::Abs(Bearing) <= 44.f ? TEXT("前方") :
+            FMath::Abs(Bearing) >= 136.f ? TEXT("后方") : Bearing > 0 ? TEXT("右侧") : TEXT("左侧");
+        RouteGuidance = FString::Printf(TEXT("%s · %s · 步行约 %d 米"), RouteName(TrackedRoute), Direction,
+            FMath::RoundToInt(Path->GetPathLength() / 100.f));
+        return;
+    }
 }
 
 UTextBlock* UARGameWidget::Text(UPanelWidget* Parent, const FString& Value, int32 Size, FLinearColor Color, FName Key)
@@ -196,7 +282,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.11 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.12 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -236,11 +322,34 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         const auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>();
         if (Mode && Mode->IsExpeditionTown())
         {
-            Button(Footer, TEXT("前往地牢一 [E]"), TEXT("Deploy"));
+            Button(Footer, TEXT("前往地牢一"), TEXT("Deploy"));
             Button(Footer, TEXT("前往地牢二"), TEXT("DeploySecond"));
             Button(Footer, TEXT("前往地牢三"), TEXT("DeployThird"));
+            Gap(ModalBody, 8);
+            Text(ModalBody, TEXT(""), 16, Cyan, TEXT("ExpeditionDifficulty"));
+            auto* Tiers = WidgetTree->ConstructWidget<UHorizontalBox>();
+            ModalBody->AddChild(Tiers);
+            const FName TierKeys[] = { TEXT("Tier1"), TEXT("Tier2"), TEXT("Tier3") };
+            for (int32 Tier = 1; Tier <= UARRunGameInstance::MaxExpeditionTier; ++Tier)
+                Button(Tiers, TEXT(""), TEXT("SelectTier"), Tier, TierKeys[Tier - 1]);
+            Button(Tiers, TEXT("随机出征 [E]"), TEXT("DeployRandom"));
         }
         else Button(Footer, TEXT("携带所选物品出发 [E]"), TEXT("Deploy"));
+    }
+    else if (Screen == EARUIScreen::Routes)
+    {
+        Text(ModalBody, TEXT("选择接下来的路线"), 30, Gold);
+        Text(ModalBody, TEXT(""), 17, Cyan, TEXT("RouteStatus"));
+        Text(ModalBody, TEXT(""), 16, Muted, TEXT("RouteCargo"));
+        Gap(ModalBody, 12);
+        Button(ModalBody, TEXT("补给路线 [1]"), TEXT("TrackRoute"), static_cast<int32>(EARExpeditionRoute::Supplies));
+        Text(ModalBody, TEXT(""), 16, Muted, TEXT("RouteSupplies"));
+        Button(ModalBody, TEXT("精英路线 [2]"), TEXT("TrackRoute"), static_cast<int32>(EARExpeditionRoute::Elite));
+        Text(ModalBody, TEXT(""), 16, Muted, TEXT("RouteElite"));
+        Button(ModalBody, TEXT("撤离路线 [3]"), TEXT("TrackRoute"), static_cast<int32>(EARExpeditionRoute::Extract));
+        Text(ModalBody, TEXT(""), 16, Muted, TEXT("RouteExtract"));
+        Gap(ModalBody, 12);
+        Button(ModalBody, TEXT("关闭路线牌 [E / Esc]"), TEXT("Close"));
     }
     else if (Screen == EARUIScreen::Inventory)
     {
@@ -316,9 +425,11 @@ void UARGameWidget::Refresh()
     if (S->Phase != EARRunPhase::Hub) bMainMenu = false;
     if (bPaused && (S->Phase == EARRunPhase::Result || S->Phase == EARRunPhase::Settling))
     { bPaused = false; UGameplayStatics::SetGamePaused(this, false); }
+    if (OpenBoard.IsValid() && !OpenBoard->CanOpen(P)) OpenBoard.Reset();
+    UpdateRouteGuidance(P, S);
     const EARUIScreen Desired = S->Phase == EARRunPhase::Result || S->Phase == EARRunPhase::Settling ? EARUIScreen::Result :
         bMainMenu ? EARUIScreen::MainMenu : bPaused ? EARUIScreen::Pause : P->bCampOpen ? EARUIScreen::Camp :
-        P->bShopOpen ? EARUIScreen::Shop : P->bInventoryVisible ? EARUIScreen::Inventory : EARUIScreen::Game;
+        OpenBoard.IsValid() ? EARUIScreen::Routes : P->bShopOpen ? EARUIScreen::Shop : P->bInventoryVisible ? EARUIScreen::Inventory : EARUIScreen::Game;
     if (View != Desired) BuildScreen(Desired);
     for (const auto& Pair : Labels)
     {
@@ -378,10 +489,15 @@ FString UARGameWidget::LabelText(FName Key) const
         for (TActorIterator<AARExpeditionPassage> It(GetWorld()); It; ++It)
             if (It->CanUse(P)) return FString::Printf(TEXT("[E] %s"), *It->Prompt.ToString());
         for (TActorIterator<AARPortal> It(GetWorld()); It; ++It) if (FVector::Dist2D(P->GetActorLocation(), It->GetActorLocation()) < 250) return TEXT("[E] 撤离  ·  在蓝色传送阵内停留 3 秒");
+        for (TActorIterator<AARExpeditionRouteBoard> It(GetWorld()); It; ++It)
+            if (It->CanOpen(P)) return TEXT("[E] 查看路线  ·  补给、精英或撤离");
         return TEXT("[F] 技能  ·  [Q] 药水  ·  [Tab] 背包  ·  [Esc] 暂停");
     }
     if (Key == TEXT("HudRoute"))
     {
+        if (!RouteGuidance.IsEmpty()) return RouteGuidance;
+        if (S->Phase == EARRunPhase::InDungeon && S->ExpeditionTier > 0)
+            return FString::Printf(TEXT("随机出征 · 难度 %d  ·  本局种子 %d"), S->ExpeditionTier, S->Seed);
         for (TActorIterator<AARDungeonDirector> It(GetWorld()); It; ++It)
             if (P->CanPlay() && It->RoomOrder.Num() == 3)
             {
@@ -399,6 +515,39 @@ FString UARGameWidget::LabelText(FName Key) const
     if (Key == TEXT("ClassMage")) return Mage ? TEXT("✓ 法师 [2]") : TEXT("选择法师 [2]");
     if (Key == TEXT("ClassDescription")) return FString::Printf(TEXT("%s  ·  基础生命 %.0f"), Mage ? TEXT("法师：远程法术与奥术爆发") : TEXT("战士：近战攻击与旋风斩"), P->BaseMaxHealth());
     if (Key == TEXT("CampBank")) return FString::Printf(TEXT("银行  %d 金币 / %d 符文  ·  本次准备暂未扣除仓库物品"), BankGold, BankRunes);
+    if (Key == TEXT("ExpeditionDifficulty"))
+    {
+        const int32 Tier = S->SelectedExpeditionTier();
+        return FString::Printf(TEXT("随机出征 %d 档 · 精英 %d 名 · 敌方生命 +%d%% · 金币 +%d%% · 装备掉率 %d%%"),
+            Tier, Tier - 1, 20 * (Tier - 1), ARExpedition::GoldPercent(Tier) - 100, ARExpedition::EquipmentChance(Tier));
+    }
+    if (Key == TEXT("Tier1") || Key == TEXT("Tier2") || Key == TEXT("Tier3"))
+    {
+        const int32 Tier = FCString::Atoi(*K.Right(1));
+        return FString::Printf(TEXT("%s%d 档%s"), Tier == S->SelectedExpeditionTier() ? TEXT("✓ ") : TEXT(""),
+            Tier, Tier > S->HighestExpeditionTier() ? TEXT("（锁定）") : TEXT(""));
+    }
+    if (Key == TEXT("RouteStatus"))
+        return FString::Printf(TEXT("生命 %.0f/%.0f · 金币 %d · 药水 %d · 背包 %d/%d"),
+            P->Health->CurrentHealth, P->Health->MaxHealth, S->RunGold,
+            P->Inventory->Count(TEXT("Potion")), P->Inventory->Items.Num(), P->Inventory->Capacity);
+    if (Key == TEXT("RouteCargo"))
+    {
+        TArray<FString> Gear;
+        for (FName Item : { FName(TEXT("IronSword")), FName(TEXT("OakStaff")), FName(TEXT("LeatherArmor")), FName(TEXT("RunicCharm")) })
+            if (P->Inventory->Count(Item) > 0) Gear.Add(ItemName(Item));
+        return Gear.Num() > 0 ? TEXT("携带装备 · ") + FString::Join(Gear, TEXT("、")) : TEXT("携带装备 · 无");
+    }
+    if (Key == TEXT("RouteSupplies"))
+        return RouteDistances.FindRef(Key) + TEXT(" · 金色传送点 · 药水 8 金币，攻击强化 15 金币");
+    if (Key == TEXT("RouteElite") && OpenBoard.IsValid())
+    {
+        const FString Reward = ItemName(OpenBoard->EliteReward());
+        return FString::Printf(TEXT("%s · %s · 掉落 %s"),
+            *RouteDistances.FindRef(Key), OpenBoard->HasClearedElite() ? TEXT("精英已击败") : TEXT("挑战一名精英"), *Reward);
+    }
+    if (Key == TEXT("RouteExtract"))
+        return RouteDistances.FindRef(Key) + TEXT(" · 蓝色传送阵 · 停留 3 秒带出当前战利品");
     if (Key == TEXT("VitalityLabel") || Key == TEXT("MightLabel"))
     {
         const bool Vitality = Key == TEXT("VitalityLabel"); const FName Talent = Vitality ? FName(TEXT("Vitality")) : FName(TEXT("Might"));
@@ -424,7 +573,12 @@ FString UARGameWidget::LabelText(FName Key) const
     if (Key == TEXT("ResultBank")) return FString::Printf(TEXT("银行：%d 金币 / %d 符文  ·  本局%s符文 %d"), BankGold, BankRunes, S->Summary.bSuccess ? TEXT("带出") : TEXT("损失"), S->Summary.EarnedRunes);
     if (Key == TEXT("ResultBoss")) return S->Summary.bBossDefeated ? TEXT("灰烬守望者已击败") : TEXT("灰烬守望者未击败");
     if (Key == TEXT("ResultLoot")) return FString(S->Summary.bSuccess ? TEXT("带出物品\n") : TEXT("损失物品\n")) + ItemList(S->Summary.Loot);
-    if (Key == TEXT("ResultHint")) return S->Phase == EARRunPhase::Settling ? TranslateNotice(S->LastError) : S->Summary.bSuccess ? TEXT("战利品已保存，可在营地准备下一次挑战。") : TEXT("未携带的仓库物品与永久天赋仍然保留。");
+    if (Key == TEXT("ResultHint"))
+    {
+        if (S->Phase == EARRunPhase::Settling) return TranslateNotice(S->LastError);
+        if (S->Summary.UnlockedTier > 0) return FString::Printf(TEXT("战利品已保存 · 已解锁随机出征 %d 档"), S->Summary.UnlockedTier);
+        return S->Summary.bSuccess ? TEXT("战利品已保存，可在营地准备下一次挑战。") : TEXT("仓库物品、永久天赋和已解锁的难度仍然保留。");
+    }
     return FString();
 }
 
@@ -436,15 +590,34 @@ bool UARGameWidget::ExecuteAction(FName Action, int32 Payload)
     { bMainMenu = false; P->bCampOpen = true; Done = true; }
     else if ((Action == TEXT("Warrior") || Action == TEXT("Mage")) && (View == EARUIScreen::MainMenu || View == EARUIScreen::Camp))
         Done = P->SelectClass(Action == TEXT("Mage") ? EARPlayerClass::Mage : EARPlayerClass::Warrior);
-    else if ((Action == TEXT("Deploy") || Action == TEXT("DeploySecond") || Action == TEXT("DeployThird")) && View == EARUIScreen::Camp)
+    else if ((Action == TEXT("Deploy") || Action == TEXT("DeploySecond") || Action == TEXT("DeployThird") || Action == TEXT("DeployRandom")) && View == EARUIScreen::Camp)
     {
         auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>();
         if (Mode && Mode->IsExpeditionTown())
         {
-            const int32 Destination = Action == TEXT("DeployThird") ? 2 : Action == TEXT("DeploySecond") ? 1 : 0;
+            int32 Destination = 0;
+            if (Action == TEXT("DeploySecond")) Destination = 1;
+            if (Action == TEXT("DeployThird")) Destination = 2;
+            if (Action == TEXT("DeployRandom")) Destination = INDEX_NONE;
             Done = Mode->DepartTown(P, Destination);
         }
         else if (Action == TEXT("Deploy")) { P->Interact(); Done = S->Phase == EARRunPhase::InDungeon; }
+    }
+    else if (Action == TEXT("SelectTier") && View == EARUIScreen::Camp)
+    {
+        Done = S->SelectExpeditionTier(Payload);
+        if (!Done) P->ShowNotice(TEXT("在已解锁的最高档成功撤离后开放下一档。"));
+    }
+    else if (Action == TEXT("TrackRoute") && View == EARUIScreen::Routes && OpenBoard.IsValid() && Payload >= 1 && Payload <= 3)
+    {
+        const auto Route = static_cast<EARExpeditionRoute>(Payload);
+        Done = OpenBoard->Choose(Route, P);
+        if (Done)
+        {
+            TrackedRoute = Route;
+            NextRouteUpdate = 0;
+            OpenBoard.Reset();
+        }
     }
     else if ((Action == TEXT("PreparePlus") || Action == TEXT("PrepareMinus")) && View == EARUIScreen::Camp && Payload >= 0 && Payload < 5)
     {
@@ -472,6 +645,7 @@ bool UARGameWidget::ExecuteAction(FName Action, int32 Payload)
         if (View == EARUIScreen::Camp) { P->bCampOpen = false; Done = true; }
         if (View == EARUIScreen::Inventory) { P->bInventoryVisible = false; Done = true; }
         if (View == EARUIScreen::Shop) { P->bShopOpen = false; P->ActiveShop = nullptr; Done = true; }
+        if (View == EARUIScreen::Routes) { OpenBoard.Reset(); Done = true; }
     }
     else if (Action == TEXT("Return") && View == EARUIScreen::Result)
     { P->ReturnOrRetry(); Done = S->Phase != EARRunPhase::Settling; }
@@ -502,7 +676,7 @@ FReply UARGameWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent
     if (Key == EKeys::Escape)
     {
         if (View == EARUIScreen::Pause) ExecuteAction(TEXT("Resume"));
-        else if (View == EARUIScreen::Camp || View == EARUIScreen::Shop || View == EARUIScreen::Inventory) ExecuteAction(TEXT("Close"));
+        else if (View == EARUIScreen::Camp || View == EARUIScreen::Shop || View == EARUIScreen::Inventory || View == EARUIScreen::Routes) ExecuteAction(TEXT("Close"));
         else if (View == EARUIScreen::Game) TogglePause();
         return FReply::Handled();
     }
@@ -515,12 +689,21 @@ FReply UARGameWidget::NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent
     if (View == EARUIScreen::Pause) return FReply::Handled();
     if (View == EARUIScreen::Camp)
     {
-        if (Key == EKeys::B) ExecuteAction(TEXT("Close")); else if (Key == EKeys::E) ExecuteAction(TEXT("Deploy"));
+        if (Key == EKeys::B) ExecuteAction(TEXT("Close"));
+        else if (Key == EKeys::E) ExecuteAction(FindAction(TEXT("DeployRandom")) ? TEXT("DeployRandom") : TEXT("Deploy"));
         else if (Key == EKeys::One) ExecuteAction(TEXT("Warrior")); else if (Key == EKeys::Two) ExecuteAction(TEXT("Mage"));
         else if (Key == EKeys::T) ExecuteAction(TEXT("Vitality")); else if (Key == EKeys::Y) ExecuteAction(TEXT("Might"));
         else if (Key == EKeys::Up) P->CampPrevious(); else if (Key == EKeys::Down) P->CampNext();
         else if (Key == EKeys::Left) ExecuteAction(TEXT("PrepareMinus"), P->CampRow); else if (Key == EKeys::Right) ExecuteAction(TEXT("PreparePlus"), P->CampRow);
         Refresh(); return FReply::Handled();
+    }
+    if (View == EARUIScreen::Routes)
+    {
+        if (Key == EKeys::E) ExecuteAction(TEXT("Close"));
+        else if (Key == EKeys::One) ExecuteAction(TEXT("TrackRoute"), 1);
+        else if (Key == EKeys::Two) ExecuteAction(TEXT("TrackRoute"), 2);
+        else if (Key == EKeys::Three) ExecuteAction(TEXT("TrackRoute"), 3);
+        return FReply::Handled();
     }
     if (View == EARUIScreen::Inventory)
     {

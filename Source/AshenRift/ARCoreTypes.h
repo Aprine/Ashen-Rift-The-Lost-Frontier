@@ -19,5 +19,7 @@ struct FARRunSummary
     UPROPERTY(BlueprintReadOnly) int32 LostGold = 0;
     UPROPERTY(BlueprintReadOnly) int32 EarnedRunes = 0;
     UPROPERTY(BlueprintReadOnly) bool bBossDefeated = false;
+    UPROPERTY(BlueprintReadOnly) int32 ExpeditionTier = 0;
+    UPROPERTY(BlueprintReadOnly) int32 UnlockedTier = 0;
     UPROPERTY(BlueprintReadOnly) TMap<FName, int32> Loot;
 };

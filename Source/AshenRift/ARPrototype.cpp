@@ -184,6 +184,11 @@ void AARPlayerCharacter::Interact()
     auto* PC = Cast<APlayerController>(Controller);
     auto* HUD = PC ? Cast<AARPrototypeHUD>(PC->GetHUD()) : nullptr;
     if (HUD && HUD->GameUI && HUD->GameUI->IsMenuOpen()) return;
+    if (HUD && HUD->GameUI && HUD->GameUI->CurrentScreen() == EARUIScreen::Routes)
+    {
+        HUD->GameUI->CloseRouteBoard();
+        return;
+    }
     if (bShopOpen) { bShopOpen = false; ActiveShop = nullptr; return; }
     if (State->Phase == EARRunPhase::Hub)
     {
@@ -203,6 +208,9 @@ void AARPlayerCharacter::Interact()
         if (!It->Use(this)) ShowNotice(TEXT("暂时无法通过，出口被挡住了。"));
         return;
     }
+    if (HUD && HUD->GameUI)
+        for (TActorIterator<AARExpeditionRouteBoard> It(GetWorld()); It; ++It)
+            if (HUD->GameUI->OpenRouteBoard(*It)) return;
     for (TActorIterator<AARPortal> It(GetWorld()); It; ++It)
     {
         if (FVector::Dist2D(GetActorLocation(), It->GetActorLocation()) <= 250 && State->BeginExtraction())
@@ -243,6 +251,9 @@ void AARPlayerCharacter::Damaged()
 {
     bShopOpen = false;
     ActiveShop = nullptr;
+    if (const auto* PC = Cast<APlayerController>(Controller))
+        if (auto* HUD = Cast<AARPrototypeHUD>(PC->GetHUD()))
+            if (HUD->GameUI) HUD->GameUI->CloseRouteBoard();
     if (auto* State = Run(this)) State->CancelExtraction();
     ExtractUntil = 0;
     ShowNotice(TEXT("Taking damage!"));
@@ -441,17 +452,44 @@ void AARPrototypeGameMode::ClearRunActors()
 }
 bool AARPrototypeGameMode::StartDungeon(AARPlayerCharacter* Player)
 {
-    if (IsExpeditionTown()) return DepartTown(Player, 0);
-    return EnterDungeon(Player);
+    if (IsExpeditionTown()) return DepartTown(Player, INDEX_NONE);
+    for (TActorIterator<AARDungeonDirector> It(GetWorld()); It; ++It)
+        if (It->bUseFixedSeed) return EnterDungeon(Player, It->FixedSeed);
+    return EnterDungeon(Player, FMath::Rand());
 }
 
-bool AARPrototypeGameMode::EnterDungeon(AARPlayerCharacter* Player)
+AAREnemy* AARPrototypeGameMode::SpawnExpeditionEnemy(TSubclassOf<AAREnemy> Class, FVector Position, FVector Facing, FName Drop, int32 Tier)
+{
+    if (!Class) return nullptr;
+    const FTransform Transform(FRotator(0, (Facing - Position).Rotation().Yaw, 0), Position);
+    auto* Enemy = GetWorld()->SpawnActorDeferred<AAREnemy>(Class, Transform, nullptr, nullptr,
+        ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+    if (!Enemy) return nullptr;
+    Enemy->DropItemID = Drop;
+    UGameplayStatics::FinishSpawningActor(Enemy, Transform);
+    if (Tier > 1)
+    {
+        Enemy->Damage *= 1.f + .1f * (Tier - 1);
+        Enemy->Health->MaxHealth *= 1.f + .2f * (Tier - 1);
+        Enemy->Health->ResetHealth();
+        Enemy->GoldReward = FMath::RoundToInt(Enemy->GoldReward * ARExpedition::GoldPercent(Tier) / 100.f);
+    }
+    return Enemy;
+}
+
+AAREnemy* AARPrototypeGameMode::SpawnRouteElite(AARPlayerCharacter* Player, FVector Position, FName RewardItem)
+{
+    const auto* State = Run(this);
+    if (!State || State->Phase != EARRunPhase::InDungeon || !IsValid(Player)) return nullptr;
+    return SpawnExpeditionEnemy(EliteEnemyClass, Position, Player->GetActorLocation(), RewardItem, State->ExpeditionTier);
+}
+
+bool AARPrototypeGameMode::EnterDungeon(AARPlayerCharacter* Player, int32 Seed, int32 Tier)
 {
     auto* State = Run(this);
     AARDungeonDirector* Director = nullptr;
     for (TActorIterator<AARDungeonDirector> It(GetWorld()); It; ++It) { Director = *It; break; }
-    const int32 Seed = Director && Director->bUseFixedSeed ? Director->FixedSeed : FMath::Rand();
-    if (!Player || !State || !Player->IsAtCamp() || !State->BeginRun(Seed, Player->Inventory)) return false;
+    if (!Player || !State || !Player->IsAtCamp() || !State->BeginExpedition(Seed, Player->Inventory, Tier)) return false;
     ClearRunActors();
     if (Director) Director->Generate(Seed);
     Player->ResetCombatForRun();
@@ -471,23 +509,32 @@ bool AARPrototypeGameMode::EnterDungeon(AARPlayerCharacter* Player)
     if (ExpeditionSite)
     {
         const FTransform SiteTransform = ExpeditionSite->GetActorTransform();
+        const auto Encounters = ARExpedition::MakeEncounters(ExpeditionSite->EncounterOffsets.Num(), Seed, Tier);
+        FRandomStream Rewards(Seed ^ 0x7cf104);
+        const FName ClassWeapon = Player->SelectedClass == EARPlayerClass::Mage ? TEXT("OakStaff") : TEXT("IronSword");
+        const FName FixedDrops[] = { TEXT("LeatherArmor"), TEXT("RunicCharm"), ClassWeapon };
         for (int32 Index = 0; Index < ExpeditionSite->EncounterOffsets.Num(); ++Index)
         {
             const FVector Position = SiteTransform.TransformPosition(ExpeditionSite->EncounterOffsets[Index]);
-            const auto SpawnClass = Index == 1 ? RangedEnemyClass : Index == 2 ? EliteEnemyClass : EnemyClass;
-            const FTransform SpawnTransform((Entry - Position).Rotation(), Position);
-            if (auto* Enemy = GetWorld()->SpawnActorDeferred<AAREnemy>(SpawnClass, SpawnTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn))
+            TSubclassOf<AAREnemy> SpawnClass = EnemyClass;
+            if (Encounters[Index] == EARExpeditionEnemy::Ranged) SpawnClass = RangedEnemyClass;
+            if (Encounters[Index] == EARExpeditionEnemy::Elite) SpawnClass = EliteEnemyClass;
+            FName Drop;
+            if (Tier == 0)
             {
-                Enemy->DropItemID = Index == 0 ? TEXT("LeatherArmor") : Index == 1 ? TEXT("RunicCharm") :
-                    Player->SelectedClass == EARPlayerClass::Mage ? TEXT("OakStaff") : TEXT("IronSword");
-                UGameplayStatics::FinishSpawningActor(Enemy, SpawnTransform);
+                Drop = FixedDrops[FMath::Min(Index, static_cast<int32>(UE_ARRAY_COUNT(FixedDrops)) - 1)];
             }
+            else if (Rewards.RandRange(1, 100) <= ARExpedition::EquipmentChance(Tier))
+                Drop = ARExpedition::ChooseEquipment(Rewards, Player->SelectedClass);
+            SpawnExpeditionEnemy(SpawnClass ? SpawnClass : EnemyClass, Position, Entry, Drop, Tier);
         }
         if (BossClass)
         {
             const FVector Position = SiteTransform.TransformPosition(ExpeditionSite->BossOffset);
-            GetWorld()->SpawnActor<AARBoss>(BossClass, Position, (Entry - Position).Rotation());
+            SpawnExpeditionEnemy(BossClass.Get(), Position, Entry, BossClass.GetDefaultObject()->DropItemID, Tier);
         }
+        for (TActorIterator<AARExpeditionRouteBoard> It(GetWorld()); It; ++It)
+            It->InitializeRun(Seed, Player->SelectedClass);
     }
     else if (Director) Director->Populate(Player, EnemyClass, RangedEnemyClass, EliteEnemyClass, BossClass);
     else

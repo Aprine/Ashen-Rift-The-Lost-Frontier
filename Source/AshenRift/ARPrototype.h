@@ -166,6 +166,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bUseNavigation = false;
     UFUNCTION(BlueprintCallable) bool StartDungeon(AARPlayerCharacter* Player);
     bool DepartTown(AARPlayerCharacter* Player, int32 Destination);
+    AAREnemy* SpawnRouteElite(AARPlayerCharacter* Player, FVector Position, FName RewardItem);
     bool IsExpeditionTown() const;
     bool ReturnFromExpedition(AARPlayerCharacter* Player);
     FVector CampLocation() const;
@@ -174,7 +175,8 @@ public:
 private:
     UPROPERTY() AARExpeditionSite* ExpeditionSite = nullptr;
     void BeginAuthoredDungeon();
-    bool EnterDungeon(AARPlayerCharacter* Player);
+    bool EnterDungeon(AARPlayerCharacter* Player, int32 Seed, int32 Tier = 0);
+    AAREnemy* SpawnExpeditionEnemy(TSubclassOf<AAREnemy> Class, FVector Position, FVector Facing, FName Drop, int32 Tier);
 };
 
 UCLASS()

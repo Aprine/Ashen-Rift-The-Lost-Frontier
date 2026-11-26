@@ -14,6 +14,18 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.12 — 2026-11-26
+
+### Added
+
+- Added random departure from town. The run seed selects one of three authored dungeons, assigns combatants to authored encounter points and rolls equipment drops.
+- Added three saved expedition tiers. A successful extraction at the highest unlocked tier opens the next one and selects it for the next departure. Higher tiers increase elite counts, enemy stats and rewards.
+- Added a route board in Dungeon 3 with the live player status, carried equipment, walking distances and previews for supplies, an elite fight and extraction. The seed chooses the elite encounter site, named equipment reward and active extraction destination.
+
+### Validation
+
+- All 13 regression tests passed, including a rendered run of the new route and tier progression test. Three earlier test saves loaded with tier 1. Development Editor and Game builds, Blueprint compilation and the WindowsNoEditor map cook passed.
+
 ## 0.11 — 2026-11-26
 
 ### Added

@@ -11,6 +11,8 @@ public:
     UPROPERTY(SaveGame, BlueprintReadOnly) int32 SaveVersion = 1;
     UPROPERTY(SaveGame, BlueprintReadOnly) int32 BankGold = 0;
     UPROPERTY(SaveGame, BlueprintReadOnly) int32 BankRunes = 0;
+    // Tagged saves from earlier builds keep the default when this field is absent.
+    UPROPERTY(SaveGame, BlueprintReadOnly) int32 HighestExpeditionTier = 1;
     UPROPERTY(SaveGame, BlueprintReadOnly) TMap<FName, int32> Stash;
     UPROPERTY(SaveGame, BlueprintReadOnly) TMap<FName, int32> TalentRanks;
 };

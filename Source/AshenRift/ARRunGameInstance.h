@@ -15,9 +15,10 @@ class ASHENRIFT_API UARRunGameInstance : public UGameInstance
     GENERATED_BODY()
 public:
     virtual void Init() override;
-    // Only session data crosses level travel; the profile format stays the same.
     EARPlayerClass TravelClass = EARPlayerClass::Warrior;
     FName PendingExpedition;
+    int32 PendingExpeditionSeed = 0;
+    int32 PendingExpeditionTier = 0;
     bool bHasDepartedTown = false;
     UPROPERTY(BlueprintReadOnly, Category="Run") EARRunPhase Phase = EARRunPhase::Hub;
     UPROPERTY(BlueprintReadOnly, Category="Run") int32 RunGold = 0;
@@ -26,11 +27,17 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="Run") bool bBossDefeated = false;
     UPROPERTY(BlueprintReadOnly, Category="Run") int32 RunRunes = 0;
     UPROPERTY(BlueprintReadOnly, Category="Run") int32 Seed = 0;
+    UPROPERTY(BlueprintReadOnly, Category="Run") int32 ExpeditionTier = 0;
     UPROPERTY(BlueprintReadOnly, Category="Run") FARRunSummary Summary;
     UPROPERTY(BlueprintReadOnly, Category="Save") UARProfile* Profile = nullptr;
     UPROPERTY(BlueprintReadOnly, Category="Save") FString LastError;
     UPROPERTY(BlueprintAssignable) FARRunChanged OnChanged;
     UFUNCTION(BlueprintCallable, Category="Run") bool BeginRun(int32 InSeed, UARInventoryComponent* LoadoutInventory = nullptr);
+    bool BeginExpedition(int32 InSeed, UARInventoryComponent* LoadoutInventory, int32 Tier);
+    static constexpr int32 MaxExpeditionTier = 3;
+    int32 HighestExpeditionTier() const;
+    int32 SelectedExpeditionTier() const { return CampExpeditionTier; }
+    bool SelectExpeditionTier(int32 Tier);
     UPROPERTY(BlueprintReadOnly, Category="Camp") TMap<FName, int32> PreparedLoadout;
     UFUNCTION(BlueprintPure, Category="Camp") int32 TalentRank(FName Talent) const;
     UFUNCTION(BlueprintPure, Category="Camp") int32 TalentCost(FName Talent) const;
@@ -53,6 +60,7 @@ private:
     UPROPERTY() UARInventoryComponent* PendingInventory = nullptr;
     bool bProfileLoaded = false;
     bool bProfileTransaction = false;
+    int32 CampExpeditionTier = 1;
     bool CanManageCamp(AARPlayerCharacter* Player) const;
     bool CommitPendingSave();
     void FinishSettlement();

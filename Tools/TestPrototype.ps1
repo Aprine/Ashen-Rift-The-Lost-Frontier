@@ -2,7 +2,7 @@ param(
     [string]$EngineRoot = 'D:\Epic Games\UE_4.27',
     [ValidateSet('/Game/AshenRift/Maps/L_FrontierDungeon', '/Game/AshenRift/Maps/L_RandomDungeon')]
     [string]$DungeonMap = '/Game/AshenRift/Maps/L_FrontierDungeon',
-    [ValidateSet('Core', 'Integration.RunLoop', 'Integration.Progression', 'Integration.RandomDungeon', 'Integration.Camp', 'Integration.EnemyVariants', 'Integration.UserInterface', 'Integration.CombatFeedback', 'Integration.TeamMap', 'Integration.Expeditions')]
+    [ValidateSet('Core', 'Integration.RunLoop', 'Integration.Progression', 'Integration.RandomDungeon', 'Integration.Camp', 'Integration.EnemyVariants', 'Integration.UserInterface', 'Integration.CombatFeedback', 'Integration.TeamMap', 'Integration.Expeditions', 'Integration.RouteExpeditions')]
     [string[]]$Only = @()
 )
 $ErrorActionPreference = 'Stop'
@@ -10,7 +10,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $editorFile = Join-Path $EngineRoot 'Engine\Binaries\Win64\UE4Editor-Cmd.exe'
 $projectFile = Join-Path $projectRoot 'AshenRift.uproject'
 $suites = @('Core', 'Integration.RunLoop', 'Integration.Progression', 'Integration.RandomDungeon', 'Integration.Camp', 'Integration.EnemyVariants', 'Integration.UserInterface', 'Integration.CombatFeedback')
-if ($DungeonMap -like '*/L_FrontierDungeon') { $suites += @('Integration.TeamMap', 'Integration.Expeditions') }
+if ($DungeonMap -like '*/L_FrontierDungeon') { $suites += @('Integration.TeamMap', 'Integration.Expeditions', 'Integration.RouteExpeditions') }
 if ($Only.Count -gt 0) {
     foreach ($selectedSuite in $Only) { if ($selectedSuite -notin $suites) { throw "Suite $selectedSuite is not supported on $DungeonMap" } }
     $suites = $Only
@@ -22,7 +22,10 @@ foreach ($suite in $suites) {
     $testArgs = @($projectFile)
     if ($suite -eq 'Integration.RunLoop') { $testArgs += @('/Game/AshenRift/Maps/L_FirstPlayable', '-game', '-ARTestProfile') }
     if ($suite -eq 'Integration.Progression') { $testArgs += @('/Game/AshenRift/Maps/L_Progression', '-game', '-ARTestProfile') }
-    if ($suite -eq 'Integration.Expeditions') { $testArgs += @('/Game/AshenRift/Maps/Map_Hub', '-game', '-ARTestProfile') }
+    if ($suite -in @('Integration.Expeditions', 'Integration.RouteExpeditions')) {
+        $testArgs += @('/Game/AshenRift/Maps/Map_Hub', '-game', '-ARTestProfile')
+    }
+    if ($suite -eq 'Integration.RouteExpeditions') { $testArgs += @('-ARExpeditionSeed=9') }
     if ($suite -in @('Integration.RandomDungeon', 'Integration.Camp', 'Integration.EnemyVariants', 'Integration.UserInterface', 'Integration.CombatFeedback', 'Integration.TeamMap')) {
         $testArgs += @($DungeonMap, '-game', '-ARTestProfile')
     }

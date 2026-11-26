@@ -1,11 +1,25 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ARCoreTypes.h"
 #include "GameFramework/Actor.h"
 #include "ARExpeditionSite.generated.h"
 
 class AARPlayerCharacter;
+class AAREnemy;
+class AARPortal;
 class UStaticMeshComponent;
+
+enum class EARExpeditionEnemy : uint8 { Melee, Ranged, Elite };
+
+namespace ARExpedition
+{
+    int32 GoldPercent(int32 Tier);
+    int32 EquipmentChance(int32 Tier);
+    int32 ChooseDungeon(int32 Seed, int32 MapCount);
+    TArray<EARExpeditionEnemy> MakeEncounters(int32 Count, int32 Seed, int32 Tier);
+    FName ChooseEquipment(FRandomStream& Random, EARPlayerClass PlayerClass);
+}
 
 // Place one marker per authored level. Its transform defines the preparation
 // point in town or the entry point in a dungeon. Spawn locations are local to it.
@@ -36,4 +50,36 @@ public:
 
     bool CanUse(const AARPlayerCharacter* Player) const;
     bool Use(AARPlayerCharacter* Player) const;
+};
+
+UENUM()
+enum class EARExpeditionRoute : uint8 { None, Supplies, Elite, Extract };
+
+UCLASS()
+class ASHENRIFT_API AARExpeditionRouteBoard : public AActor
+{
+    GENERATED_BODY()
+public:
+    AARExpeditionRouteBoard();
+
+    UPROPERTY(EditInstanceOnly, Category="Routes") AARExpeditionPassage* ShopPassage = nullptr;
+    UPROPERTY(EditInstanceOnly, Category="Routes") AARPortal* EntrancePortal = nullptr;
+    UPROPERTY(EditAnywhere, Category="Routes", meta=(MakeEditWidget)) TArray<FVector> EliteOffsets;
+    UPROPERTY(EditAnywhere, Category="Routes", meta=(MakeEditWidget)) TArray<FVector> ExtractionOffsets;
+
+    void InitializeRun(int32 Seed, EARPlayerClass PlayerClass);
+    bool CanOpen(const AARPlayerCharacter* Player) const;
+    bool Choose(EARExpeditionRoute Route, AARPlayerCharacter* Player);
+    FVector Target(EARExpeditionRoute Route) const;
+    FName EliteReward() const { return RewardItem; }
+    bool HasStartedElite() const { return bEliteStarted; }
+    bool HasClearedElite() const { return bEliteStarted && !Elite.IsValid(); }
+
+private:
+    UPROPERTY() AARPortal* RoutePortal = nullptr;
+    TWeakObjectPtr<AAREnemy> Elite;
+    FVector ElitePosition = FVector::ZeroVector;
+    FName RewardItem;
+    bool bReady = false;
+    bool bEliteStarted = false;
 };

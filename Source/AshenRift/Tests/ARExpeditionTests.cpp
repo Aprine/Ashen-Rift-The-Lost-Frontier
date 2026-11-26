@@ -112,7 +112,8 @@ class FARExpeditionCommand : public IAutomationLatentCommand
             if (auto* Found = Cast<AARBoss>(*It)) Boss = Found;
             else ++Encounters;
         }
-        for (TActorIterator<AARPortal> It(World); It; ++It) Portal = *It;
+        for (TActorIterator<AARPortal> It(World); It; ++It)
+            if (It->ActorHasTag(TEXT("ExpeditionExtraction"))) Portal = *It;
         const bool bRoomsLoaded = World->GetStreamingLevels().Num() == 2 &&
             World->GetStreamingLevels().ContainsByPredicate([](const ULevelStreaming* Level) {
                 return Level && Level->GetLoadedLevel() && Level->GetWorldAssetPackageName().EndsWith(TEXT("/Map_Shop"));

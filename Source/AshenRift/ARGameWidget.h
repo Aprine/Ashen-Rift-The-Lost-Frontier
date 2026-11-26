@@ -12,7 +12,9 @@ class UBorder;
 class UProgressBar;
 class UPanelWidget;
 class AARPlayerCharacter;
+class AARExpeditionRouteBoard;
 class UARRunGameInstance;
+enum class EARExpeditionRoute : uint8;
 
 UCLASS()
 class ASHENRIFT_API UARActionButton : public UButton
@@ -26,7 +28,7 @@ public:
 };
 
 UENUM(BlueprintType)
-enum class EARUIScreen : uint8 { Game, MainMenu, Pause, Camp, Inventory, Shop, Result };
+enum class EARUIScreen : uint8 { Game, MainMenu, Pause, Camp, Inventory, Shop, Result, Routes };
 
 UCLASS(Blueprintable)
 class ASHENRIFT_API UARGameWidget : public UUserWidget
@@ -44,6 +46,8 @@ public:
     UFUNCTION(BlueprintCallable) bool OpenMainMenu();
     UFUNCTION(BlueprintPure) EARUIScreen CurrentScreen() const { return View; }
     bool BlocksGameplayInput() const;
+    bool OpenRouteBoard(AARExpeditionRouteBoard* Board);
+    void CloseRouteBoard();
     bool IsMenuOpen() const { return bMainMenu || bPaused; }
     void InitializeMenu(bool bShow) { bMainMenu = bShow; }
     void Refresh();
@@ -69,7 +73,13 @@ private:
     bool bBuilt = false;
     bool bMainMenu = true;
     bool bPaused = false;
+    TWeakObjectPtr<AARExpeditionRouteBoard> OpenBoard;
+    EARExpeditionRoute TrackedRoute{};
+    TMap<FName, FString> RouteDistances;
+    FString RouteGuidance;
+    float NextRouteUpdate = 0.f;
     void BuildRoot();
+    void UpdateRouteGuidance(AARPlayerCharacter* P, const UARRunGameInstance* State);
     void BuildScreen(EARUIScreen Screen);
     void ApplyInputMode();
     UTextBlock* Text(UPanelWidget* Parent, const FString& Value, int32 Size = 16, FLinearColor Color = FLinearColor::White, FName Key = NAME_None);

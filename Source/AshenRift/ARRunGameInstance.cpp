@@ -20,7 +20,8 @@ void UARRunGameInstance::Init()
     if (UGameplayStatics::DoesSaveGameExist(Slot, 0))
     {
         Profile = Cast<UARProfile>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-        if (!Profile || Profile->SaveVersion != 1 || Profile->BankGold < 0 || Profile->BankRunes < 0)
+        if (!Profile || Profile->SaveVersion != 1 || Profile->BankGold < 0 || Profile->BankRunes < 0 ||
+            Profile->HighestExpeditionTier < 1 || Profile->HighestExpeditionTier > MaxExpeditionTier)
         {
             Profile = nullptr;
             LastError = TEXT("Profile load failed or unsupported version. Existing save was not overwritten.");
@@ -37,10 +38,31 @@ void UARRunGameInstance::Init()
     }
     else Profile = Cast<UARProfile>(UGameplayStatics::CreateSaveGameObject(UARProfile::StaticClass()));
     bProfileLoaded = Profile != nullptr;
+    CampExpeditionTier = HighestExpeditionTier();
 }
+
+int32 UARRunGameInstance::HighestExpeditionTier() const
+{
+    return Profile ? Profile->HighestExpeditionTier : 1;
+}
+
+bool UARRunGameInstance::SelectExpeditionTier(int32 Tier)
+{
+    if (!bProfileLoaded || bProfileTransaction || Phase != EARRunPhase::Hub ||
+        !PendingExpedition.IsNone() || Tier < 1 || Tier > HighestExpeditionTier()) return false;
+    CampExpeditionTier = Tier;
+    return true;
+}
+
 bool UARRunGameInstance::BeginRun(int32 InSeed, UARInventoryComponent* LoadoutInventory)
 {
-    if (!bProfileLoaded || bProfileTransaction || Phase != EARRunPhase::Hub) return false;
+    return BeginExpedition(InSeed, LoadoutInventory, 0);
+}
+
+bool UARRunGameInstance::BeginExpedition(int32 InSeed, UARInventoryComponent* LoadoutInventory, int32 Tier)
+{
+    if (!bProfileLoaded || bProfileTransaction || Phase != EARRunPhase::Hub ||
+        Tier < 0 || Tier > HighestExpeditionTier()) return false;
     TGuardValue<bool> Guard(bProfileTransaction, true);
     if (LoadoutInventory && (!IsValid(LoadoutInventory) || LoadoutInventory->Items.Num() != 0 ||
         !IsValid(LoadoutInventory->GetOwner()) || LoadoutInventory->GetOwner()->GetGameInstance() != this)) return false;
@@ -73,6 +95,7 @@ bool UARRunGameInstance::BeginRun(int32 InSeed, UARInventoryComponent* LoadoutIn
     GoldEarned = GoldSpent = 0;
     bBossDefeated = false;
     Seed = InSeed;
+    ExpeditionTier = Tier;
     Summary = FARRunSummary();
     LastError.Empty();
     Phase = EARRunPhase::InDungeon;
@@ -135,6 +158,7 @@ bool UARRunGameInstance::SettleRun(bool bSuccess, UARInventoryComponent* Invento
     Summary.EarnedGold = GoldEarned;
     Summary.SpentGold = GoldSpent;
     Summary.bBossDefeated = bBossDefeated;
+    Summary.ExpeditionTier = ExpeditionTier;
     Summary.EarnedRunes = RunRunes;
     Summary.BankedGold = bSuccess ? RunGold : 0;
     Summary.LostGold = bSuccess ? 0 : RunGold;
@@ -151,6 +175,8 @@ bool UARRunGameInstance::SettleRun(bool bSuccess, UARInventoryComponent* Invento
     }
     PendingProfile->BankGold += RunGold;
     PendingProfile->BankRunes += RunRunes;
+    if (ExpeditionTier == Profile->HighestExpeditionTier && ExpeditionTier < MaxExpeditionTier)
+        ++PendingProfile->HighestExpeditionTier;
     for (const auto& Pair : Summary.Loot)
     {
         const int32 Existing = PendingProfile->Stash.FindRef(Pair.Key);
@@ -174,6 +200,11 @@ bool UARRunGameInstance::CommitPendingSave()
         OnChanged.Broadcast();
         return false;
     }
+    if (PendingProfile->HighestExpeditionTier > Profile->HighestExpeditionTier)
+    {
+        Summary.UnlockedTier = PendingProfile->HighestExpeditionTier;
+        CampExpeditionTier = Summary.UnlockedTier;
+    }
     Profile = PendingProfile;
     PendingProfile = nullptr;
     FinishSettlement();
@@ -196,6 +227,7 @@ void UARRunGameInstance::FinishSettlement()
 bool UARRunGameInstance::ReturnToHub()
 {
     if (Phase != EARRunPhase::Result) return false;
+    ExpeditionTier = 0;
     Phase = EARRunPhase::Hub;
     OnChanged.Broadcast();
     return true;
