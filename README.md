@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and Blueprints**. Explore dungeons, collect loot, buy supplies, and choose between extracting safely or pushing deeper for greater rewards and permanent progression.
 
-**Version:** 0.13 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with seeded expeditions and a modular branch in Dungeon 3
+**Version:** 0.14 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with seeded expeditions and a modular branch in Dungeon 3
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
@@ -29,7 +29,7 @@ Town preparation → Random expedition or manual dungeon → Explore and collect
 - **Town and three expeditions:** Choose one of Kuangxin's hand-authored dungeons from the preparation panel. Dungeon 3 has a larger layout with separate merchant and Boss areas. Both areas can be visited within the same run, with the player's health, inventory and run currency carried through each passage.
 - **Random expeditions and difficulty tiers:** A run seed selects the dungeon, enemy arrangement and equipment drops. Extraction at the highest unlocked tier opens the next of three tiers, with stronger enemies and better rewards.
 - **Dungeon 3 route board:** Preview the merchant, a seeded elite encounter with a listed equipment drop, or a seeded extraction destination. The board displays health, potions, gold and carried gear. Selecting a route tracks it on the HUD.
-- **Modular branch:** Preview a six-room map in Dungeon 3. The seed chooses how the rooms connect, and the dungeon assembles their doors and walkable floors when you enter the branch. The merchant, elite and extraction room share the current run.
+- **Modular branch:** Preview seven interconnected rooms in Dungeon 3. The seed chooses how the rooms connect, and the dungeon assembles their doors and walkable floors on entry. The route map marks visited rooms and cleared threats and previews the elite drop and guarded storeroom reward.
 - **Classic shuffled layouts:** the previous `L_FrontierDungeon` remains playable in Classic mode. Its three editable combat-room Blueprints, Pillars, Barricade and Cross, still change order according to the seed.
 - **Equipment and economy:** weapon, armour and charm slots, drops, potions, limited shop stock and temporary damage upgrades.
 - **Persistent progression:** shared Vitality and Might talents, item storage and camp loadout preparation.
@@ -81,6 +81,8 @@ The default map is `/Game/AshenRift/Maps/Map_Hub`. Open the project in UE 4.27.2
 
 Choose a class in the main menu, enter town and press **B** near the spawn to prepare. Select an unlocked difficulty tier and choose **Random expedition** or press **E**. The three named dungeon buttons launch practice runs. In Dungeon 3, find the **route board**, press **E**, then press **4** to preview the modular branch. Select a room, follow the HUD to the green passage and press **E** to enter. Press **M** inside the branch to reopen the map. Press **R** at settlement to return to town.
 
+The storeroom connects the elite room to either the merchant room or the exit. Defeat its guard and press **E** at the chest to claim two potions or two runes, as shown on the map.
+
 To compile the Development game target:
 
 ```powershell
@@ -102,6 +104,7 @@ The play script uses your local Unreal installation. The Development game execut
 | Select an expedition tier or launch a practice dungeon | Difficulty or dungeon buttons in town preparation |
 | Track supplies / elite / extraction | 1 / 2 / 3 or click the route board |
 | Preview and track the modular branch | 4 on the route board, or M near the branch entrance and inside |
+| Claim the guarded storeroom reward | E near the chest after defeating its guard |
 | Open inventory | Tab |
 | Equip or unequip weapon / armour / charm | Z / X / C |
 | Open camp preparation | B, while near camp |
@@ -129,7 +132,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 
 ## Validation
 
-The suite covers health, inventory, room seeds, the run loop, progression, dungeon navigation, camp management, enemy variants, UI, combat feedback, all three expeditions, tier progression and the generated branch. See the [0.13 branch notes](Docs/19_Modular_Branch.md) for the latest run results.
+The suite covers health, inventory, room seeds, the run loop, progression, dungeon navigation, camp management, enemy variants, UI, combat feedback, all three expeditions, tier progression and the generated branch with its guarded chest. See the [0.14 storeroom notes](Docs/20_Storeroom_Routes.md) for the latest run results.
 
 Run the existing suite after building the editor module:
 
@@ -169,6 +172,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 | Topic | Documentation |
 |---|---|
+| Version 0.14 guarded storeroom and live route status | [Storeroom routes](Docs/20_Storeroom_Routes.md) |
 | Version 0.13 generated routes and modular rooms | [Modular branch](Docs/19_Modular_Branch.md) |
 | Version 0.12 random expeditions, tiers and route board | [Random expeditions and routes](Docs/18_Random_Expeditions.md) |
 | Version 0.11 Dungeon 3, merchant and Boss areas | [Dungeon 3 integration](Docs/17_Dungeon_Three.md) |
@@ -188,7 +192,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 ## Current limitations and next steps
 
 - The integrated environment uses KayKit assets and retains some greybox support geometry. Characters and weapons still use template or simple placeholder visuals. Some scene signs remain in English.
-- All three main expeditions use authored layouts. Dungeon 3 also has a generated wing with six room types and three possible connection patterns. The Classic dungeon shuffles combat-room layouts along its fixed route.
+- All three main expeditions use authored layouts. Dungeon 3 also has a generated wing with seven room types and four possible connection patterns. The Classic dungeon shuffles combat-room layouts along its fixed route.
 - Combat animations are basic generated overlays. Damage still uses existing gameplay timing rather than animation-driven hit events.
 - The stash has a fixed item list without item instances, random affixes, crafting or insurance.
 - Sound settings currently provide a session-level on/off toggle. Background music, volume sliders and final mixing remain future work.

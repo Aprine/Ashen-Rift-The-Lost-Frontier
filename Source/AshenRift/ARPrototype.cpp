@@ -10,6 +10,7 @@
 #include "ARGameWidget.h"
 #include "ARCombatFeedback.h"
 #include "ARExpeditionSite.h"
+#include "ARBranchWing.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -203,6 +204,12 @@ void AARPlayerCharacter::Interact()
     for (TActorIterator<AARShop> It(GetWorld()); It; ++It)
     {
         if (It->CanTrade(this)) { ActiveShop = *It; bShopOpen = true; bInventoryVisible = false; return; }
+    }
+    for (TActorIterator<AARBranchCache> It(GetWorld()); It; ++It)
+    {
+        if (!It->IsNearby(this)) continue;
+        It->Claim(this);
+        return;
     }
     for (TActorIterator<AARExpeditionPassage> It(GetWorld()); It; ++It)
     {

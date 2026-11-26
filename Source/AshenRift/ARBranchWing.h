@@ -6,13 +6,15 @@
 #include "ARBranchWing.generated.h"
 
 class AARExpeditionPassage;
+class AAREnemy;
 class AARPlayerCharacter;
 class AARPortal;
 class AARShop;
 class UStaticMesh;
+class UStaticMeshComponent;
 class UMaterialInterface;
 
-enum class EARBranchRoom : uint8 { Entry, Guard, Junction, Supplies, Elite, Exit, Count };
+enum class EARBranchRoom : uint8 { Entry, Guard, Junction, Supplies, Elite, Exit, Cache, Count };
 
 // Each edge connects two room indices. The same pair defines a map line and
 // the physical doorway. Cells with a shared edge can be crossed both ways.
@@ -43,11 +45,33 @@ struct FARBranchRoomStyle
 };
 
 UCLASS()
+class ASHENRIFT_API AARBranchCache : public AActor
+{
+    GENERATED_BODY()
+public:
+    AARBranchCache();
+    static constexpr int32 RewardAmount = 2;
+
+    void Configure(AAREnemy* InGuard, bool bGiveRunes);
+    bool IsNearby(const AARPlayerCharacter* Player) const;
+    bool Claim(AARPlayerCharacter* Player);
+    FString Prompt() const;
+    bool IsClaimed() const { return bClaimed; }
+
+private:
+    TWeakObjectPtr<AAREnemy> Guard;
+    bool bRunes = false;
+    bool bClaimed = false;
+};
+
+UCLASS()
 class ASHENRIFT_API AARExpeditionBranchWing : public AActor
 {
     GENERATED_BODY()
 public:
     AARExpeditionBranchWing();
+    virtual void PostLoad() override;
+    virtual void Tick(float DeltaSeconds) override;
 
     static constexpr int32 RoomSize = 2000;
     UPROPERTY(EditInstanceOnly, Category="Branch") AARExpeditionPassage* Entrance = nullptr;
@@ -65,6 +89,12 @@ public:
     FVector Center(int32 Room) const;
     FVector Goal(int32 Room) const;
     FName EliteReward() const { return Reward; }
+    bool CacheHoldsRunes() const { return bCacheRunes; }
+    bool WasVisited(int32 Room) const { return Visited.Contains(Room); }
+    bool WasCacheClaimed() const;
+    int32 LivingEnemies(int32 Room) const;
+    void RecordVisit(const FVector& Position);
+    static bool IsEncounter(int32 Room);
     static const TCHAR* Name(int32 Room);
 
 private:
@@ -73,8 +103,12 @@ private:
     UPROPERTY() AARExpeditionPassage* Return = nullptr;
     UPROPERTY() AARPortal* Exit = nullptr;
     UPROPERTY() AARShop* Shop = nullptr;
+    UPROPERTY() AARBranchCache* Cache = nullptr;
     FARBranchPlan Layout;
+    TSet<int32> Visited;
+    TArray<TArray<TWeakObjectPtr<AAREnemy>>> RoomEnemies;
     FName Reward;
+    bool bCacheRunes = false;
     bool bPrepared = false;
     bool bBuilt = false;
 

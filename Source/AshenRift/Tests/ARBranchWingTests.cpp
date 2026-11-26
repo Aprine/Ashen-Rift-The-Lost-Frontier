@@ -40,6 +40,8 @@ class FARBranchWingCommand : public IAutomationLatentCommand
     TArray<FVector> Retreat;
     int32 Step = 0;
     int32 ExpectedGold = 0;
+    int32 ExpectedPotions = 0;
+    int32 ExpectedRunes = 0;
     bool bCapturedMap = false;
     bool bCapturedRoom = false;
     FName Equipment;
@@ -89,6 +91,57 @@ class FARBranchWingCommand : public IAutomationLatentCommand
         }
         return Test.TestTrue(TEXT("Every room can reach the return passage and the branch exit"), bConnected) &
             Test.TestTrue(TEXT("A player-size capsule crosses only the edges shown on the map"), bCollisionMatches);
+    }
+
+    bool ValidateCache(UWorld* World, AARExpeditionBranchWing* Wing, AARPlayerCharacter* Player, UARGameWidget* UI, UARRunGameInstance* State)
+    {
+        AARBranchCache* Cache = nullptr;
+        AAREnemy* Guard = nullptr;
+        for (TActorIterator<AARBranchCache> It(World); It; ++It) Cache = *It;
+        for (TActorIterator<AAREnemy> It(World); It; ++It)
+            if (Wing->RoomAt(It->GetActorLocation()) == Id(EARBranchRoom::Cache)) Guard = *It;
+        if (!Test.TestTrue(TEXT("The generated storeroom has one guarded chest"),
+            Cache && Guard && Wing->LivingEnemies(Id(EARBranchRoom::Cache)) == 1)) return false;
+        const bool bRunes = Wing->CacheHoldsRunes();
+        const int32 Potions = Player->Inventory->Count(TEXT("Potion"));
+        const int32 Runes = State->RunRunes;
+        Player->SetActorLocation(Cache->GetActorLocation() + FVector(0, 0, 100));
+        Player->Interact();
+        if (!Test.TestTrue(TEXT("Interacting before defeating the guard grants nothing"),
+            !Cache->IsClaimed() && Player->Inventory->Count(TEXT("Potion")) == Potions && State->RunRunes == Runes)) return false;
+
+        Player->ToggleBranchMap();
+        if (!Test.TestTrue(TEXT("Route map marks the current storeroom and previews the guarded reward"),
+            UI->LabelText(TEXT("BranchNode6")).Contains(TEXT("●")) &&
+            UI->LabelText(TEXT("BranchEnemies")).Contains(TEXT("储藏 1")) &&
+            UI->LabelText(TEXT("BranchReward")).Contains(bRunes ? TEXT("2 枚符文") : TEXT("2 瓶治疗药水")))) return false;
+        UI->ExecuteAction(TEXT("Close"));
+        Guard->Health->ReceiveDamage(5000);
+        if (!bRunes)
+        {
+            const int32 Fill = Player->Inventory->MaxStack - Potions - 1;
+            if (!Test.TestTrue(TEXT("Fixture leaves only one slot in the potion stack"),
+                Player->Inventory->TryAdd(TEXT("Potion"), Fill))) return false;
+            Player->Interact();
+            if (!Test.TestTrue(TEXT("An insufficient potion stack leaves the whole chest available"),
+                !Cache->IsClaimed() && Player->Inventory->Count(TEXT("Potion")) == Potions + Fill)) return false;
+            Player->Inventory->TryRemove(TEXT("Potion"), Fill);
+        }
+        Player->Interact();
+        Player->Interact();
+        if (!Test.TestTrue(TEXT("A cleared chest grants exactly one complete reward"),
+            Wing->WasCacheClaimed() && Wing->LivingEnemies(Id(EARBranchRoom::Cache)) == 0 &&
+            Player->Inventory->Count(TEXT("Potion")) == Potions + (bRunes ? 0 : AARBranchCache::RewardAmount) &&
+            State->RunRunes == Runes + (bRunes ? AARBranchCache::RewardAmount : 0))) return false;
+        Player->ToggleBranchMap();
+        if (!Test.TestTrue(TEXT("The route map reflects the cleared guard and claimed chest"),
+            UI->LabelText(TEXT("BranchEnemies")).Contains(TEXT("储藏 0")) &&
+            UI->LabelText(TEXT("BranchReward")).Contains(TEXT("已领取")))) return false;
+        UI->ExecuteAction(TEXT("Close"));
+        for (TActorIterator<AARLoot> It(World); It; ++It)
+            if (It->ItemID == TEXT("Gold") && Wing->RoomAt(It->GetActorLocation()) == Id(EARBranchRoom::Cache))
+                It->TryCollect(Player);
+        return true;
     }
 
 public:
@@ -145,7 +198,7 @@ public:
             {
                 if (World->GetTimeSeconds() < ReadyAt) return false;
                 bCapturedMap = true;
-                FScreenshotRequest::RequestScreenshot(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("V013_BranchMap.png")), true, false);
+                FScreenshotRequest::RequestScreenshot(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("V014_BranchMap.png")), true, false);
                 return false;
             }
             if (!Test.TestTrue(TEXT("Selecting a node guides the player toward the entrance"),
@@ -154,7 +207,7 @@ public:
             State->AddCurrency(25, 0);
             Player->SetActorLocation(Wing->Entrance->GetActorLocation() + Stand);
             Player->Interact();
-            if (!Test.TestTrue(TEXT("E assembles the six-room wing and arrives on the entry module"),
+            if (!Test.TestTrue(TEXT("E assembles the seven-room wing and arrives on the entry module"),
                 Wing->IsBuilt() && Wing->RoomAt(Player->GetActorLocation()) == Id(EARBranchRoom::Entry) && State->RunGold == 25)) return true;
             ReadyAt = World->GetTimeSeconds() + 1.1f;
             Stage = 3;
@@ -166,13 +219,13 @@ public:
             if (!bCapturedRoom && FParse::Param(FCommandLine::Get(), TEXT("ARCaptureBranchMap")))
             {
                 bCapturedRoom = true;
-                FScreenshotRequest::RequestScreenshot(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("V013_BranchRoom.png")), true, false);
+                FScreenshotRequest::RequestScreenshot(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("V014_BranchRoom.png")), true, false);
                 return false;
             }
             int32 Modules = 0;
             for (TActorIterator<AActor> It(World); It; ++It)
                 if (It->ActorHasTag(TEXT("BranchModule"))) ++Modules;
-            if (!Test.TestEqual(TEXT("Exactly six room modules were instantiated"), Modules, Id(EARBranchRoom::Count))) return true;
+            if (!Test.TestEqual(TEXT("Exactly seven room modules were instantiated"), Modules, Id(EARBranchRoom::Count))) return true;
             if (!ValidateDoors(World, Wing, Player)) return true;
             Player->ToggleBranchMap();
             if (!Test.TestTrue(TEXT("M shows the current room in the wing"),
@@ -190,6 +243,7 @@ public:
                 UI->ExecuteAction(TEXT("BuyPotion")) && State->RunGold == 17)) return true;
             UI->ExecuteAction(TEXT("Close"));
 
+            if (!ValidateCache(World, Wing, Player, UI, State)) return true;
             AAREliteEnemy* Elite = nullptr;
             for (TActorIterator<AAREnemy> It(World); It; ++It)
             {
@@ -212,6 +266,11 @@ public:
             if (!Test.TestNotNull(TEXT("The elite dropped actual loot in the room"), Drop)) return true;
             Player->SetActorLocation(Wing->Center(Id(EARBranchRoom::Elite)) + Stand);
             if (!Test.TestTrue(TEXT("The player can pick up the branching reward"), Gold && Gold->TryCollect(Player) && Drop->TryCollect(Player))) return true;
+            Player->ToggleBranchMap();
+            if (!Test.TestTrue(TEXT("The map distinguishes previously visited rooms from completed encounters"),
+                UI->LabelText(TEXT("BranchNode0")).StartsWith(TEXT("· ")) &&
+                UI->LabelText(TEXT("BranchNode6")).StartsWith(TEXT("✓ ")))) return true;
+            UI->ExecuteAction(TEXT("Close"));
             const auto* Path = UNavigationSystemV1::FindPathToLocationSynchronously(
                 World, Player->GetActorLocation(), Wing->Goal(Id(EARBranchRoom::Entry)) + Stand, Player);
             if (!Test.TestTrue(TEXT("A retreat path exists from the elite room"), Path && Path->IsValid() && !Path->IsPartial())) return true;
@@ -234,19 +293,24 @@ public:
             Player->SetActorLocation(Wing->Entrance->GetActorLocation() + Stand);
             Player->Interact();
             if (!Test.TestTrue(TEXT("Re-entry preserves the previously cleared branch"),
-                Wing->RoomAt(Player->GetActorLocation()) == Id(EARBranchRoom::Entry))) return true;
+                Wing->RoomAt(Player->GetActorLocation()) == Id(EARBranchRoom::Entry) && Wing->WasCacheClaimed() &&
+                Wing->WasVisited(Id(EARBranchRoom::Cache)) && Wing->LivingEnemies(Id(EARBranchRoom::Cache)) == 0)) return true;
             for (TActorIterator<AAREliteEnemy> It(World); It; ++It)
                 Test.TestTrue(TEXT("Re-entry cannot respawn the branch elite"), Wing->RoomAt(It->GetActorLocation()) == INDEX_NONE);
             Player->SetActorLocation(Wing->Goal(Id(EARBranchRoom::Exit)) + Stand);
+            ExpectedPotions = Player->Inventory->Count(TEXT("Potion"));
+            ExpectedRunes = State->RunRunes;
             Player->Interact();
             if (!Test.TestTrue(TEXT("The actual branch exit starts timed extraction"), State->Phase == EARRunPhase::Extracting)) return true;
             Stage = 5;
             return false;
         case 5:
             if (State->Phase != EARRunPhase::Result) return false;
-            Test.TestTrue(TEXT("Branch extraction saves equipment, net gold and the tier unlock"),
+            Test.TestTrue(TEXT("Branch extraction saves equipment, chest rewards, net gold and the tier unlock"),
                 State->Summary.bSuccess && State->Profile->Stash.FindRef(Equipment) == 1 &&
-                State->Profile->BankGold == ExpectedGold && State->HighestExpeditionTier() == 2);
+                State->Profile->Stash.FindRef(TEXT("Potion")) == ExpectedPotions &&
+                State->Profile->BankRunes == ExpectedRunes && State->Profile->BankGold == ExpectedGold &&
+                State->HighestExpeditionTier() == 2);
             Player->ReturnOrRetry();
             Stage = 6;
             return false;
@@ -273,7 +337,7 @@ bool FARBranchWingTest::RunTest(const FString& Parameters)
         const auto Repeated = FARBranchPlan::Generate(Sample);
         TSet<FIntPoint> Cells;
         for (const FIntPoint& Cell : Plan.Cells) Cells.Add(Cell);
-        bool bValid = Cells.Num() == Id(EARBranchRoom::Count) && Plan.Edges.Num() == Id(EARBranchRoom::Count) - 1;
+        bool bValid = Cells.Num() == Id(EARBranchRoom::Count) && Plan.Edges.Num() == Id(EARBranchRoom::Count);
         for (const FIntPoint& Edge : Plan.Edges)
         {
             const FIntPoint Delta = Plan.Cells[Edge.X] - Plan.Cells[Edge.Y];
@@ -281,10 +345,16 @@ bool FARBranchWingTest::RunTest(const FString& Parameters)
         }
         if (!TestTrue(TEXT("Seed gives a repeatable plan with unique cells and adjacent doorways"),
             bValid && Plan.Cells == Repeated.Cells && Plan.Edges == Repeated.Edges)) return false;
+        TArray<int32> Reachable = { Id(EARBranchRoom::Entry) };
+        for (int32 Index = 0; Index < Reachable.Num(); ++Index)
+            for (int32 Room = 0; Room < Id(EARBranchRoom::Count); ++Room)
+                if (Plan.Connects(Reachable[Index], Room)) Reachable.AddUnique(Room);
+        if (!TestEqual(TEXT("Every generated room has a retreat path"), Reachable.Num(), Id(EARBranchRoom::Count))) return false;
         Topologies.Add((Plan.Connects(Id(EARBranchRoom::Guard), Id(EARBranchRoom::Supplies)) ? 1 : 0) |
-            (Plan.Connects(Id(EARBranchRoom::Guard), Id(EARBranchRoom::Exit)) ? 2 : 0));
+            (Plan.Connects(Id(EARBranchRoom::Guard), Id(EARBranchRoom::Exit)) ? 2 : 0) |
+            (Plan.Connects(Id(EARBranchRoom::Cache), Id(EARBranchRoom::Supplies)) ? 4 : 0));
     }
-    TestEqual(TEXT("Seeds change connections as well as orientation"), Topologies.Num(), 3);
+    TestEqual(TEXT("Seeds change connections as well as orientation"), Topologies.Num(), 4);
     ADD_LATENT_AUTOMATION_COMMAND(FARBranchWingCommand(*this, Seed));
     return true;
 }

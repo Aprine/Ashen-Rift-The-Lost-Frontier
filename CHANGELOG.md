@@ -16,6 +16,18 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.14 — 2026-11-26
+
+### Added
+
+- Added a guarded storeroom to the modular branch. Its doorway connects the elite room to either supplies or extraction, giving a playable loop and four seeded connection patterns.
+- Added a single-claim chest that awards two healing potions or two runes based on the seed. The map previews the reward and the chest waits for its guard to be defeated and for room in the potion stack.
+- The route map now shows the current room, previously visited rooms, cleared encounters, remaining enemies and whether the chest has been claimed.
+
+### Validation
+
+- Passed all 14 regression tests. Checked 128 seed plans and ran five representative seeds that cover all four connection patterns and both chest rewards. Verified guarded access, the insufficient-capacity case, repeat-interaction protection, retreat and extraction. Development builds, Blueprint compilation and the WindowsNoEditor map cook passed.
+
 ## 0.13 — 2026-11-26
 
 ### Added

@@ -1,6 +1,8 @@
 #include "ARBranchWing.h"
 
 #include "ARExpeditionSite.h"
+#include "ARHealthComponent.h"
+#include "ARInventoryComponent.h"
 #include "ARProgression.h"
 #include "ARPrototype.h"
 #include "ARRunGameInstance.h"
@@ -9,6 +11,7 @@
 #include "Components/PointLightComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
 #include "NavigationSystem.h"
 #include "UObject/ConstructorHelpers.h"
@@ -45,16 +48,20 @@ FARBranchPlan FARBranchPlan::Generate(int32 Seed)
     const int32 Supplies = Id(EARBranchRoom::Supplies);
     const int32 Elite = Id(EARBranchRoom::Elite);
     const int32 Exit = Id(EARBranchRoom::Exit);
+    const int32 Cache = Id(EARBranchRoom::Cache);
     const int32 Layout = Random.RandRange(0, 2);
     const int32 SupplyParent = Layout == 1 ? Guard : Fork;
     const int32 ExitParent = Layout == 2 ? Guard : Fork;
     const int32 Side = Random.RandRange(0, 1) == 0 ? -1 : 1;
+    const FIntPoint Forward = Directions[Random.RandRange(0, 3)];
+    const bool bCacheToShop = Layout == 2 || (Layout == 0 && Random.RandRange(0, 1) != 0);
     FARBranchPlan Plan;
     Plan.Cells = { FIntPoint(-2, 0), FIntPoint(-1, 0), FIntPoint(0, 0),
-        FIntPoint(Layout == 1 ? -1 : 0, Side), FIntPoint(1, 0), FIntPoint(Layout == 2 ? -1 : 0, -Side) };
+        FIntPoint(Layout == 1 ? -1 : 0, Side), FIntPoint(1, 0), FIntPoint(Layout == 2 ? -1 : 0, -Side),
+        FIntPoint(1, bCacheToShop ? Side : -Side) };
     Plan.Edges = { FIntPoint(Id(EARBranchRoom::Entry), Guard), FIntPoint(Guard, Fork),
-        FIntPoint(SupplyParent, Supplies), FIntPoint(Fork, Elite), FIntPoint(ExitParent, Exit) };
-    const FIntPoint Forward = Directions[Random.RandRange(0, 3)];
+        FIntPoint(SupplyParent, Supplies), FIntPoint(Fork, Elite), FIntPoint(ExitParent, Exit),
+        FIntPoint(Elite, Cache), FIntPoint(Cache, bCacheToShop ? Supplies : Exit) };
     const FIntPoint Left(-Forward.Y, Forward.X);
     for (FIntPoint& Cell : Plan.Cells)
         Cell = FIntPoint(Cell.X * Forward.X + Cell.Y * Left.X, Cell.X * Forward.Y + Cell.Y * Left.Y);
@@ -66,8 +73,62 @@ bool FARBranchPlan::Connects(int32 A, int32 B) const
     return Edges.Contains(FIntPoint(A, B)) || Edges.Contains(FIntPoint(B, A));
 }
 
+AARBranchCache::AARBranchCache()
+{
+    RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Cache"));
+    auto* Chest = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Chest"));
+    Chest->SetupAttachment(RootComponent);
+    Chest->SetRelativeRotation(FRotator(0, 0, 90));
+    Chest->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Chest->SetCanEverAffectNavigation(false);
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> KitChest(TEXT("/Game/Environments/KayKitDungeon/Meshes/Props/SM_chest_gold.SM_chest_gold"));
+    Chest->SetStaticMesh(KitChest.Object);
+}
+
+void AARBranchCache::Configure(AAREnemy* InGuard, bool bGiveRunes)
+{
+    Guard = InGuard;
+    bRunes = bGiveRunes;
+}
+
+bool AARBranchCache::IsNearby(const AARPlayerCharacter* Player) const
+{
+    if (!IsValid(Player) || !Player->CanPlay()) return false;
+    const FVector Offset = Player->GetActorLocation() - GetActorLocation();
+    return Offset.SizeSquared2D() <= FMath::Square(195.f) && FMath::Abs(Offset.Z) <= 190.f;
+}
+
+bool AARBranchCache::Claim(AARPlayerCharacter* Player)
+{
+    auto* State = GetWorld()->GetGameInstance<UARRunGameInstance>();
+    if (!IsNearby(Player) || !State || State->Phase != EARRunPhase::InDungeon) return false;
+    if (bClaimed || Guard.IsValid())
+    {
+        Player->ShowNotice(Prompt());
+        return false;
+    }
+    // Inventory and currency changes notify UI listeners synchronously.
+    // Set the flag first so the same chest cannot grant its reward twice.
+    bClaimed = true;
+    const bool bGiven = bRunes ? State->AddCurrency(0, RewardAmount) : Player->Inventory->TryAdd(TEXT("Potion"), RewardAmount);
+    bClaimed = bGiven;
+    if (bGiven) Player->ShowNotice(bRunes ? TEXT("储藏箱 · 获得 2 枚符文") : TEXT("储藏箱 · 获得 2 瓶治疗药水"));
+    else Player->ShowNotice(bRunes ? TEXT("无法领取储藏箱奖励 · 本局符文已达上限") : TEXT("无法领取储藏箱奖励 · 请检查背包"));
+    return bGiven;
+}
+
+FString AARBranchCache::Prompt() const
+{
+    if (bClaimed) return TEXT("储藏箱已取空");
+    if (Guard.IsValid()) return TEXT("击败守卫后可打开储藏箱");
+    return bRunes ? TEXT("领取储藏箱 · 2 枚符文") : TEXT("领取储藏箱 · 2 瓶治疗药水");
+}
+
 AARExpeditionBranchWing::AARExpeditionBranchWing()
 {
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = false;
+    PrimaryActorTick.TickInterval = .15f;
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("BranchOrigin"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Floor(TEXT("/Game/Environments/KayKitDungeon/Meshes/Floors/SM_floor_tile_large.SM_floor_tile_large"));
     static ConstructorHelpers::FObjectFinder<UStaticMesh> Wall(TEXT("/Game/Environments/KayKitDungeon/Meshes/Walls/SM_wall_scaffold.SM_wall_scaffold"));
@@ -103,9 +164,32 @@ AARExpeditionBranchWing::AARExpeditionBranchWing()
     Prop(EARBranchRoom::Elite, Pillar.Object, -500, 465, FVector(76, 76, 175));
     Prop(EARBranchRoom::Elite, Rubble.Object, 545, -450, FVector(105, 100, 48));
     Prop(EARBranchRoom::Exit, Chest.Object, 635, 590);
+    Prop(EARBranchRoom::Cache, Keg.Object, -700, 630);
+    Prop(EARBranchRoom::Cache, Boxes.Object, 595, -620);
     RoomStyles[Id(EARBranchRoom::Entry)].Light = FColor(148, 191, 225);
     RoomStyles[Id(EARBranchRoom::Elite)].Light = FColor(245, 132, 105);
     RoomStyles[Id(EARBranchRoom::Exit)].Light = FColor(107, 186, 238);
+    RoomStyles[Id(EARBranchRoom::Cache)].Light = FColor(205, 214, 141);
+}
+
+void AARExpeditionBranchWing::PostLoad()
+{
+    Super::PostLoad();
+    // Dungeon 3 instances saved before the cache had six editable styles.
+    if (RoomStyles.Num() == Id(EARBranchRoom::Cache))
+        RoomStyles.Add(GetDefault<AARExpeditionBranchWing>()->RoomStyles[Id(EARBranchRoom::Cache)]);
+}
+
+void AARExpeditionBranchWing::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    if (const auto* Player = UGameplayStatics::GetPlayerPawn(this, 0)) RecordVisit(Player->GetActorLocation());
+}
+
+void AARExpeditionBranchWing::RecordVisit(const FVector& Position)
+{
+    const int32 Room = RoomAt(Position);
+    if (Room != INDEX_NONE) Visited.Add(Room);
 }
 
 void AARExpeditionBranchWing::Prepare(int32 Seed, EARPlayerClass PlayerClass)
@@ -114,6 +198,7 @@ void AARExpeditionBranchWing::Prepare(int32 Seed, EARPlayerClass PlayerClass)
     Layout = FARBranchPlan::Generate(Seed);
     FRandomStream Random(Seed ^ 0x50751);
     Reward = ARExpedition::ChooseEquipment(Random, PlayerClass);
+    bCacheRunes = FRandomStream(Seed ^ 0x106c8b).RandRange(0, 1) != 0;
     bPrepared = true;
 }
 
@@ -137,13 +222,34 @@ FVector AARExpeditionBranchWing::Goal(int32 Room) const
     if (Room == Id(EARBranchRoom::Entry) && IsValid(Return)) return Return->GetActorLocation();
     if (Room == Id(EARBranchRoom::Supplies) && IsValid(Shop)) return Shop->GetActorLocation();
     if (Room == Id(EARBranchRoom::Exit) && IsValid(Exit)) return Exit->GetActorLocation();
+    if (Room == Id(EARBranchRoom::Cache) && IsValid(Cache)) return Cache->GetActorLocation();
     return Center(Room);
 }
 
 const TCHAR* AARExpeditionBranchWing::Name(int32 Room)
 {
-    const TCHAR* Names[] = { TEXT("入口"), TEXT("战斗"), TEXT("岔路"), TEXT("补给"), TEXT("精英"), TEXT("撤离") };
+    const TCHAR* Names[] = { TEXT("入口"), TEXT("战斗"), TEXT("岔路"), TEXT("补给"), TEXT("精英"), TEXT("撤离"), TEXT("储藏") };
     return Room >= 0 && Room < Id(EARBranchRoom::Count) ? Names[Room] : TEXT("随机支路");
+}
+
+bool AARExpeditionBranchWing::IsEncounter(int32 Room)
+{
+    return Room == Id(EARBranchRoom::Guard) || Room == Id(EARBranchRoom::Elite) || Room == Id(EARBranchRoom::Cache);
+}
+
+int32 AARExpeditionBranchWing::LivingEnemies(int32 Room) const
+{
+    if (!IsEncounter(Room)) return 0;
+    if (!bBuilt) return Room == Id(EARBranchRoom::Guard) ? 2 : 1;
+    int32 Count = 0;
+    for (const TWeakObjectPtr<AAREnemy>& Enemy : RoomEnemies[Room])
+        if (Enemy.IsValid()) ++Count;
+    return Count;
+}
+
+bool AARExpeditionBranchWing::WasCacheClaimed() const
+{
+    return IsValid(Cache) && Cache->IsClaimed();
 }
 
 AActor* AARExpeditionBranchWing::BuildRoom(int32 Room)
@@ -242,14 +348,26 @@ bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player)
         Center(Id(EARBranchRoom::Supplies)) + FVector(420, -375, 60), FRotator::ZeroRotator);
     Exit = World->SpawnActor<AARPortal>(AARPortal::StaticClass(),
         Center(Id(EARBranchRoom::Exit)) + FVector(0, 0, 15), FRotator::ZeroRotator);
-    if (Pending.Num() != Layout.Cells.Num() || !Return || !Shop || !Exit)
+    Cache = World->SpawnActor<AARBranchCache>(AARBranchCache::StaticClass(),
+        Center(Id(EARBranchRoom::Cache)) + FVector(430, 440, 4), FRotator(0, 180, 0));
+    const FVector GuardAt = Center(Id(EARBranchRoom::Guard));
+    const FVector EliteAt = Center(Id(EARBranchRoom::Elite)) + FVector(0, 0, 110);
+    const FVector CacheAt = Center(Id(EARBranchRoom::Cache)) + FVector(-180, -140, 110);
+    auto* Guard = Mode->SpawnExpeditionEnemy(Mode->EnemyClass, GuardAt + FVector(-240, -95, 110), Center(0), NAME_None, State->ExpeditionTier);
+    auto* Hexer = Mode->SpawnExpeditionEnemy(Mode->RangedEnemyClass, GuardAt + FVector(255, 260, 110), Center(0), NAME_None, State->ExpeditionTier);
+    auto* Elite = Mode->SpawnExpeditionEnemy(Mode->EliteEnemyClass, EliteAt, Center(Id(EARBranchRoom::Junction)), Reward, State->ExpeditionTier);
+    auto* CacheGuard = Mode->SpawnExpeditionEnemy(bCacheRunes ? Mode->RangedEnemyClass : Mode->EnemyClass,
+        CacheAt, Center(Id(EARBranchRoom::Elite)), NAME_None, State->ExpeditionTier);
+    if (Pending.Num() != Layout.Cells.Num() || !Return || !Shop || !Exit || !Cache || !Guard || !Hexer || !Elite || !CacheGuard)
     {
         for (AActor* Actor : Pending) Actor->Destroy();
-        for (AActor* Actor : {static_cast<AActor*>(Return), static_cast<AActor*>(Shop), static_cast<AActor*>(Exit)})
+        AActor* Spawned[] = {Return, Shop, Exit, Cache, Guard, Hexer, Elite, CacheGuard};
+        for (AActor* Actor : Spawned)
             if (IsValid(Actor)) Actor->Destroy();
         Return = nullptr;
         Shop = nullptr;
         Exit = nullptr;
+        Cache = nullptr;
         return false;
     }
     Return->Prompt = FText::FromString(TEXT("返回地牢三大厅"));
@@ -260,13 +378,13 @@ bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player)
     Shop->Mesh->SetMaterial(0, TraderMaterial);
     Shop->Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Exit->Mesh->SetMaterial(0, PortalMaterial);
-
-    const FVector GuardAt = Center(Id(EARBranchRoom::Guard));
-    const FVector EliteAt = Center(Id(EARBranchRoom::Elite)) + FVector(0, 0, 110);
-    Mode->SpawnExpeditionEnemy(Mode->EnemyClass, GuardAt + FVector(-240, -95, 110), Center(0), NAME_None, State->ExpeditionTier);
-    Mode->SpawnExpeditionEnemy(Mode->RangedEnemyClass, GuardAt + FVector(255, 260, 110), Center(0), NAME_None, State->ExpeditionTier);
-    Mode->SpawnExpeditionEnemy(Mode->EliteEnemyClass, EliteAt, Center(Id(EARBranchRoom::Junction)), Reward, State->ExpeditionTier);
+    Cache->Configure(CacheGuard, bCacheRunes);
+    RoomEnemies.SetNum(Layout.Cells.Num());
+    RoomEnemies[Id(EARBranchRoom::Guard)] = { Guard, Hexer };
+    RoomEnemies[Id(EARBranchRoom::Elite)].Add(Elite);
+    RoomEnemies[Id(EARBranchRoom::Cache)].Add(CacheGuard);
     bBuilt = true;
+    SetActorTickEnabled(true);
     if (auto* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World)) Navigation->Build();
     return true;
 }

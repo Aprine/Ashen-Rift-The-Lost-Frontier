@@ -139,6 +139,7 @@ bool UARGameWidget::ToggleBranchMap()
             (!It->CanOpen(P) && !Wing->Entrance->CanUse(P) && Wing->RoomAt(P->GetActorLocation()) == INDEX_NONE)) continue;
         OpenBoard.Reset();
         OpenBranch = Wing;
+        Wing->RecordVisit(P->GetActorLocation());
         Refresh();
         return true;
     }
@@ -193,7 +194,7 @@ void UARGameWidget::BuildBranchMap()
     Text(ModalBody, TEXT(""), 17, Cyan, TEXT("RouteStatus"));
     Text(ModalBody, TEXT(""), 15, Muted, TEXT("RouteCargo"));
     auto* Sizing = WidgetTree->ConstructWidget<USizeBox>();
-    Sizing->SetHeightOverride(284);
+    Sizing->SetHeightOverride(258);
     ModalBody->AddChild(Sizing);
     auto* Map = WidgetTree->ConstructWidget<UCanvasPanel>();
     Sizing->AddChild(Map);
@@ -209,7 +210,7 @@ void UARGameWidget::BuildBranchMap()
     {
         const FIntPoint Cell = Plan.Cells[Room];
         return FVector2D(304 + (Cell.X - (Min.X + Max.X) * .5f) * 134,
-            141 - (Cell.Y - (Min.Y + Max.Y) * .5f) * 65);
+            128 - (Cell.Y - (Min.Y + Max.Y) * .5f) * 60);
     };
     for (const FIntPoint& Edge : Plan.Edges)
     {
@@ -227,9 +228,11 @@ void UARGameWidget::BuildBranchMap()
         auto* Action = Button(Body, TEXT(""), TEXT("TrackBranchRoom"), Room, FName(*FString::Printf(TEXT("BranchNode%d"), Room)));
         if (Room == static_cast<int32>(EARBranchRoom::Elite)) Action->SetBackgroundColor(FLinearColor(.45f, .16f, .12f));
         if (Room == static_cast<int32>(EARBranchRoom::Exit)) Action->SetBackgroundColor(FLinearColor(.10f, .32f, .43f));
+        if (Room == static_cast<int32>(EARBranchRoom::Cache)) Action->SetBackgroundColor(FLinearColor(.27f, .34f, .13f));
     }
-    Text(ModalBody, FString::Printf(TEXT("精英掉落：%s  ·  补给可购买药水和攻击强化"), *ItemName(OpenBranch->EliteReward())), 16, Gold);
-    Text(ModalBody, TEXT("连线可双向通行，相邻房间中心相距 20 米。点击房间后由 HUD 指路。"), 15, Muted);
+    Text(ModalBody, TEXT(""), 15, Cyan, TEXT("BranchEnemies"));
+    Text(ModalBody, TEXT(""), 16, Gold, TEXT("BranchReward"));
+    Text(ModalBody, TEXT("每条连线可往返，点击房间追踪。● 当前  · 已到过  ✓ 威胁已清"), 15, Muted);
     Button(ModalBody, TEXT("关闭路线图 [M / Esc]"), TEXT("Close"));
 }
 
@@ -372,7 +375,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.13 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.14 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -581,6 +584,8 @@ FString UARGameWidget::LabelText(FName Key) const
         if (S->Phase == EARRunPhase::Extracting) return FString::Printf(TEXT("正在撤离 %.1f 秒  ·  离开传送阵或受伤会中断"), P->ExtractionRemaining());
         if (S->Phase == EARRunPhase::Result || S->Phase == EARRunPhase::Settling) return TEXT("[R] 返回营地或重试保存");
         for (TActorIterator<AARShop> It(GetWorld()); It; ++It) if (It->CanTrade(P)) return TEXT("[E] 与商人交易  ·  使用本局金币补给");
+        for (TActorIterator<AARBranchCache> It(GetWorld()); It; ++It)
+            if (It->IsNearby(P)) return TEXT("[E] ") + It->Prompt();
         for (TActorIterator<AARExpeditionPassage> It(GetWorld()); It; ++It)
             if (It->CanUse(P)) return FString::Printf(TEXT("[E] %s"), *It->Prompt.ToString());
         for (TActorIterator<AARPortal> It(GetWorld()); It; ++It) if (FVector::Dist2D(P->GetActorLocation(), It->GetActorLocation()) < 250) return TEXT("[E] 撤离  ·  在蓝色传送阵内停留 3 秒");
@@ -646,8 +651,22 @@ FString UARGameWidget::LabelText(FName Key) const
     if (K.StartsWith(TEXT("BranchNode")) && OpenBranch.IsValid())
     {
         const int32 Room = FCString::Atoi(*K.Mid(10));
-        return FString::Printf(TEXT("%s%s"), OpenBranch->RoomAt(P->GetActorLocation()) == Room ? TEXT("● ") : TEXT(""),
-            OpenBranch->Name(Room));
+        const TCHAR* Marker = TEXT("");
+        if (OpenBranch->RoomAt(P->GetActorLocation()) == Room) Marker = TEXT("● ");
+        else if (OpenBranch->IsEncounter(Room) && OpenBranch->LivingEnemies(Room) == 0) Marker = TEXT("✓ ");
+        else if (OpenBranch->WasVisited(Room)) Marker = TEXT("· ");
+        return FString::Printf(TEXT("%s%s"), Marker, OpenBranch->Name(Room));
+    }
+    if (Key == TEXT("BranchEnemies") && OpenBranch.IsValid())
+        return FString::Printf(TEXT("剩余敌人  ·  战斗 %d  /  精英 %d  /  储藏 %d"),
+            OpenBranch->LivingEnemies(static_cast<int32>(EARBranchRoom::Guard)),
+            OpenBranch->LivingEnemies(static_cast<int32>(EARBranchRoom::Elite)),
+            OpenBranch->LivingEnemies(static_cast<int32>(EARBranchRoom::Cache)));
+    if (Key == TEXT("BranchReward") && OpenBranch.IsValid())
+    {
+        const TCHAR* Cache = OpenBranch->WasCacheClaimed() ? TEXT("已领取") :
+            OpenBranch->CacheHoldsRunes() ? TEXT("2 枚符文") : TEXT("2 瓶治疗药水");
+        return FString::Printf(TEXT("精英掉落 %s  ·  储藏箱 %s"), *ItemName(OpenBranch->EliteReward()), Cache);
     }
     if (Key == TEXT("VitalityLabel") || Key == TEXT("MightLabel"))
     {
