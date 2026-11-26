@@ -197,6 +197,12 @@ void AARPlayerCharacter::Interact()
     {
         if (It->CanTrade(this)) { ActiveShop = *It; bShopOpen = true; bInventoryVisible = false; return; }
     }
+    for (TActorIterator<AARExpeditionPassage> It(GetWorld()); It; ++It)
+    {
+        if (!It->CanUse(this)) continue;
+        if (!It->Use(this)) ShowNotice(TEXT("暂时无法通过，出口被挡住了。"));
+        return;
+    }
     for (TActorIterator<AARPortal> It(GetWorld()); It; ++It)
     {
         if (FVector::Dist2D(GetActorLocation(), It->GetActorLocation()) <= 250 && State->BeginExtraction())

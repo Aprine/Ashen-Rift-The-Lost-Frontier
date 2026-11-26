@@ -14,6 +14,22 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.11 — 2026-11-26
+
+### Added
+
+- Integrated Kuangxin's larger `Map_Dungeon3` and its dedicated `Map_Shop` and `Map_Boss` rooms. Dungeon 3 is selectable from town preparation.
+- Added paired passages to the merchant and Boss areas. The player keeps the same health, inventory, currency and purchased upgrades while moving between them. Extraction still uses the blue portal near the dungeon entrance.
+- Added five encounters to Dungeon 3, placed the Ashen Warden in the dedicated arena, and added the three maps to the Windows cook list.
+
+### Fixed
+
+- Added continuous floor collision inside verified tile rows, made the connecting doorways traversable, and configured navigation for the main dungeon, shop and arena. The imported rooms use local dynamic lights.
+
+### Validation
+
+- All 12 regression tests passed, including the expanded merchant, Boss and extraction flow with an additional rendered run. Development Editor and Game builds, Blueprint compilation and the WindowsNoEditor cook for all six current maps passed.
+
 ## 0.10 — 2026-11-25
 
 ### Added

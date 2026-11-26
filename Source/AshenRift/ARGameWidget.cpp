@@ -9,6 +9,7 @@
 #include "ARRunGameInstance.h"
 #include "ARProfile.h"
 #include "ARCombatFeedback.h"
+#include "ARExpeditionSite.h"
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
@@ -195,7 +196,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.10 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.11 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -237,6 +238,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         {
             Button(Footer, TEXT("前往地牢一 [E]"), TEXT("Deploy"));
             Button(Footer, TEXT("前往地牢二"), TEXT("DeploySecond"));
+            Button(Footer, TEXT("前往地牢三"), TEXT("DeployThird"));
         }
         else Button(Footer, TEXT("携带所选物品出发 [E]"), TEXT("Deploy"));
     }
@@ -372,8 +374,10 @@ FString UARGameWidget::LabelText(FName Key) const
         if (S->Phase == EARRunPhase::Hub) return TEXT("[B] 营地准备  ·  [1/2] 选择职业  ·  [E] 出发");
         if (S->Phase == EARRunPhase::Extracting) return FString::Printf(TEXT("正在撤离 %.1f 秒  ·  离开传送阵或受伤会中断"), P->ExtractionRemaining());
         if (S->Phase == EARRunPhase::Result || S->Phase == EARRunPhase::Settling) return TEXT("[R] 返回营地或重试保存");
-        for (TActorIterator<AARPortal> It(GetWorld()); It; ++It) if (FVector::Dist2D(P->GetActorLocation(), It->GetActorLocation()) < 250) return TEXT("[E] 撤离  ·  在蓝色传送阵内停留 3 秒");
         for (TActorIterator<AARShop> It(GetWorld()); It; ++It) if (It->CanTrade(P)) return TEXT("[E] 与商人交易  ·  使用本局金币补给");
+        for (TActorIterator<AARExpeditionPassage> It(GetWorld()); It; ++It)
+            if (It->CanUse(P)) return FString::Printf(TEXT("[E] %s"), *It->Prompt.ToString());
+        for (TActorIterator<AARPortal> It(GetWorld()); It; ++It) if (FVector::Dist2D(P->GetActorLocation(), It->GetActorLocation()) < 250) return TEXT("[E] 撤离  ·  在蓝色传送阵内停留 3 秒");
         return TEXT("[F] 技能  ·  [Q] 药水  ·  [Tab] 背包  ·  [Esc] 暂停");
     }
     if (Key == TEXT("HudRoute"))
@@ -432,10 +436,14 @@ bool UARGameWidget::ExecuteAction(FName Action, int32 Payload)
     { bMainMenu = false; P->bCampOpen = true; Done = true; }
     else if ((Action == TEXT("Warrior") || Action == TEXT("Mage")) && (View == EARUIScreen::MainMenu || View == EARUIScreen::Camp))
         Done = P->SelectClass(Action == TEXT("Mage") ? EARPlayerClass::Mage : EARPlayerClass::Warrior);
-    else if ((Action == TEXT("Deploy") || Action == TEXT("DeploySecond")) && View == EARUIScreen::Camp)
+    else if ((Action == TEXT("Deploy") || Action == TEXT("DeploySecond") || Action == TEXT("DeployThird")) && View == EARUIScreen::Camp)
     {
         auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>();
-        if (Mode && Mode->IsExpeditionTown()) Done = Mode->DepartTown(P, Action == TEXT("DeploySecond") ? 1 : 0);
+        if (Mode && Mode->IsExpeditionTown())
+        {
+            const int32 Destination = Action == TEXT("DeployThird") ? 2 : Action == TEXT("DeploySecond") ? 1 : 0;
+            Done = Mode->DepartTown(P, Destination);
+        }
         else if (Action == TEXT("Deploy")) { P->Interact(); Done = S->Phase == EARRunPhase::InDungeon; }
     }
     else if ((Action == TEXT("PreparePlus") || Action == TEXT("PrepareMinus")) && View == EARUIScreen::Camp && Payload >= 0 && Payload < 5)

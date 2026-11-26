@@ -2,25 +2,60 @@
 #include "ARPrototype.h"
 #include "ARRunGameInstance.h"
 #include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Controller.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
 #include "NavigationSystem.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
     const TCHAR* TownMap = TEXT("/Game/AshenRift/Maps/Map_Hub");
     const TCHAR* DungeonMaps[] = {
         TEXT("/Game/AshenRift/Maps/Map_Dungeon1"),
-        TEXT("/Game/AshenRift/Maps/Map_Dungeon2")
+        TEXT("/Game/AshenRift/Maps/Map_Dungeon2"),
+        TEXT("/Game/AshenRift/Maps/Map_Dungeon3")
     };
 }
 
 AARExpeditionSite::AARExpeditionSite()
 {
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Site"));
+}
+
+AARExpeditionPassage::AARExpeditionPassage()
+{
+    Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+    RootComponent = Mesh;
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> Pad(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+    Mesh->SetStaticMesh(Pad.Object);
+    Mesh->SetWorldScale3D(FVector(2.55f, 2.55f, .08f));
+    Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Mesh->SetCanEverAffectNavigation(false);
+}
+
+bool AARExpeditionPassage::CanUse(const AARPlayerCharacter* Player) const
+{
+    if (!IsValid(Player) || !IsValid(Destination) || Destination == this) return false;
+    const FVector Delta = Player->GetActorLocation() - GetActorLocation();
+    return Delta.SizeSquared2D() <= FMath::Square(175.f) && FMath::Abs(Delta.Z) < 180.f;
+}
+
+bool AARExpeditionPassage::Use(AARPlayerCharacter* Player) const
+{
+    if (!CanUse(Player)) return false;
+    const FVector Arrival = Destination->GetActorTransform().TransformPositionNoScale(Destination->ArrivalOffset);
+    const float Yaw = Destination->GetActorRotation().Yaw;
+    if (!Player->TeleportTo(Arrival, FRotator(0, Yaw, 0))) return false;
+    Player->GetCharacterMovement()->StopMovementImmediately();
+    if (auto* Controller = Player->GetController()) Controller->SetControlRotation(FRotator(-15, Yaw, 0));
+    return true;
 }
 
 void AARPrototypeGameMode::StartPlay()
@@ -82,6 +117,7 @@ void AARPrototypeGameMode::BeginAuthoredDungeon()
     // The destination pawn exists before BeginRun attempts the stash debit.
     // A direct editor launch also starts a run at the authored PlayerStart.
     State->PendingExpedition = NAME_None;
+    if (GetWorld()->GetStreamingLevels().Num() > 0) GetWorld()->FlushLevelStreaming();
     if (auto* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld())) Navigation->Build();
     if (!EnterDungeon(Player))
     {

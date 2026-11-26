@@ -7,11 +7,13 @@
 #include "../ARPrototype.h"
 #include "../ARProgression.h"
 #include "../ARGameWidget.h"
+#include "../ARExpeditionSite.h"
 #include "../ARHealthComponent.h"
 #include "../ARInventoryComponent.h"
 #include "../ARRunGameInstance.h"
 #include "../ARProfile.h"
 #include "Engine/Engine.h"
+#include "Engine/LevelStreaming.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
@@ -89,6 +91,85 @@ class FARExpeditionCommand : public IAutomationLatentCommand
             }
         }
         return Test.TestTrue(TEXT("One side of the shop has a connected interaction point"), bHasApproach) && bConnected;
+    }
+
+    bool CheckThirdDungeon(UWorld* World, AARPlayerCharacter* Player, AARPrototypeGameMode* Mode, UARRunGameInstance* State)
+    {
+        AARExpeditionPassage* ShopDoor = nullptr;
+        AARExpeditionPassage* BossDoor = nullptr;
+        for (TActorIterator<AARExpeditionPassage> It(World); It; ++It)
+        {
+            if (It->ActorHasTag(TEXT("ExpeditionShopEntrance"))) ShopDoor = *It;
+            if (It->ActorHasTag(TEXT("ExpeditionBossEntrance"))) BossDoor = *It;
+        }
+        AARShop* Shop = nullptr;
+        AARBoss* Boss = nullptr;
+        AARPortal* Portal = nullptr;
+        int32 Encounters = 0;
+        for (TActorIterator<AARShop> It(World); It; ++It) Shop = *It;
+        for (TActorIterator<AAREnemy> It(World); It; ++It)
+        {
+            if (auto* Found = Cast<AARBoss>(*It)) Boss = Found;
+            else ++Encounters;
+        }
+        for (TActorIterator<AARPortal> It(World); It; ++It) Portal = *It;
+        const bool bRoomsLoaded = World->GetStreamingLevels().Num() == 2 &&
+            World->GetStreamingLevels().ContainsByPredicate([](const ULevelStreaming* Level) {
+                return Level && Level->GetLoadedLevel() && Level->GetWorldAssetPackageName().EndsWith(TEXT("/Map_Shop"));
+            }) &&
+            World->GetStreamingLevels().ContainsByPredicate([](const ULevelStreaming* Level) {
+                return Level && Level->GetLoadedLevel() && Level->GetWorldAssetPackageName().EndsWith(TEXT("/Map_Boss"));
+            });
+        if (!Test.TestTrue(TEXT("Dungeon 3 starts with both authored rooms, one merchant, one boss, five enemies and extraction"),
+            bRoomsLoaded && Shop && Boss && Portal && Encounters == 5)) return false;
+        if (!Test.TestTrue(TEXT("Shop and boss entrances have reciprocal links"),
+            ShopDoor && IsValid(ShopDoor->Destination) && ShopDoor->Destination->Destination == ShopDoor &&
+            BossDoor && IsValid(BossDoor->Destination) && BossDoor->Destination->Destination == BossDoor)) return false;
+
+        const FVector Stand(0, 0, 96);
+        const auto Reaches = [&](const TCHAR* Label, const FVector& From, const FVector& Goal)
+        {
+            const auto* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, From, Goal, Player);
+            return Test.TestTrue(Label, Path && Path->IsValid() && !Path->IsPartial());
+        };
+        const auto Arrive = [&](AARExpeditionPassage* Door)
+        {
+            Player->SetActorLocation(Door->GetActorLocation() + Stand);
+            Player->Interact();
+            const FVector Expected = Door->Destination->GetActorTransform().TransformPositionNoScale(Door->Destination->ArrivalOffset);
+            return FVector::Dist2D(Expected, Player->GetActorLocation()) < 65;
+        };
+        const FVector Entry = Player->GetActorLocation();
+        const FVector Trader = Shop->GetActorLocation() + FVector(0, 155, 50);
+        bool bConnected = Reaches(TEXT("Dungeon 3 entrance reaches its shop gate"), Entry, ShopDoor->GetActorLocation() + Stand);
+        bConnected &= Reaches(TEXT("Dungeon 3 entrance reaches its boss gate"), Entry, BossDoor->GetActorLocation() + Stand);
+        bConnected &= Reaches(TEXT("Dungeon 3 boss gate can return to extraction"), BossDoor->GetActorLocation() + Stand, Portal->GetActorLocation() + Stand);
+        if (!bConnected) return false;
+
+        const int32 OriginalSeed = State->Seed;
+        Player->Health->ReceiveDamage(10);
+        const float HealthBeforeTravel = Player->Health->CurrentHealth;
+        if (!Test.TestTrue(TEXT("Dungeon 3 can accumulate loot before shopping"), State->AddCurrency(40, 1) && Player->Inventory->TryAdd(TEXT("RunicCharm"), 1))) return false;
+        if (!Test.TestTrue(TEXT("E enters the dedicated shop from Dungeon 3"), Arrive(ShopDoor))) return false;
+        if (!Reaches(TEXT("Shop arrival reaches the counter"), Player->GetActorLocation(), Trader)) return false;
+        Player->SetActorLocation(Trader);
+        Player->Interact();
+        if (!Test.TestTrue(TEXT("Trader sells a run upgrade for 15 gold"), Shop->Purchase(Player, 2) && State->RunGold == 25 && Player->RunPowerBonus == 5)) return false;
+        Player->Interact();
+        if (!Test.TestTrue(TEXT("E returns from the shop and enters the dedicated boss room"), Arrive(ShopDoor->Destination) && Arrive(BossDoor))) return false;
+        if (!Reaches(TEXT("Boss arrival reaches the arena"), Player->GetActorLocation(), Boss->GetActorLocation())) return false;
+        if (!Test.TestTrue(TEXT("Room changes preserve the pawn, seed, health, earned loot and the purchased upgrade"),
+            UGameplayStatics::GetPlayerCharacter(World, 0) == Player && State->Seed == OriginalSeed &&
+            State->RunGold == 25 && State->RunRunes == 1 && Player->Health->CurrentHealth == HealthBeforeTravel &&
+            Player->Inventory->Count(TEXT("RunicCharm")) == 1 && Player->RunPowerBonus == 5)) return false;
+
+        Boss->Health->ReceiveDamage(10000);
+        if (!Test.TestTrue(TEXT("Defeating the boss is recorded on the same run"), State->bBossDefeated)) return false;
+        if (!Test.TestTrue(TEXT("The arena return gate leads back to Dungeon 3"), Arrive(BossDoor->Destination))) return false;
+        Mode->ClearRunActors();
+        Player->SetActorLocation(Portal->GetActorLocation() + Stand);
+        Player->Interact();
+        return Test.TestTrue(TEXT("Dungeon 3 starts normal timed extraction"), State->Phase == EARRunPhase::Extracting);
     }
 public:
     explicit FARExpeditionCommand(FAutomationTestBase& InTest) : Test(InTest) {}
@@ -200,6 +281,25 @@ public:
         case 8:
             if (!Mode->IsExpeditionTown()) return false;
             Test.TestTrue(TEXT("Death returns to town with restored health"), Player->IsAtCamp() && !Player->Health->bDead && Player->Health->CurrentHealth == Player->Health->MaxHealth);
+            Player->ToggleCamp(); UI->Refresh();
+            if (!Test.TestTrue(TEXT("Third dungeon button starts travel"), UI->ExecuteAction(TEXT("DeployThird")))) return true;
+            Stage = 9;
+            return false;
+        case 9:
+            if (!World->GetMapName().EndsWith(TEXT("Map_Dungeon3")) || State->Phase != EARRunPhase::InDungeon || World->GetTimeSeconds() < 1.25f) return false;
+            if (!CheckThirdDungeon(World, Player, Mode, State)) return true;
+            Stage = 10;
+            return false;
+        case 10:
+            if (State->Phase != EARRunPhase::Result) return false;
+            Test.TestTrue(TEXT("Dungeon 3 extraction banks the net gold and equipment"), State->Summary.bSuccess &&
+                State->Profile->BankGold == 50 && State->Profile->Stash.FindRef(TEXT("RunicCharm")) == 1 && State->Summary.bBossDefeated);
+            Player->ReturnOrRetry();
+            Stage = 11;
+            return false;
+        case 11:
+            if (!Mode->IsExpeditionTown()) return false;
+            Test.TestTrue(TEXT("Third expedition returns to the normal town start"), Player->IsAtCamp() && State->Phase == EARRunPhase::Hub);
             UGameplayStatics::DeleteGameInSlot(State->GetProfileSlot(), 0);
             return true;
         }
