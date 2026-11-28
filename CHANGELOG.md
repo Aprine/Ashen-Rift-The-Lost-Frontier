@@ -16,6 +16,21 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.18 — 2026-11-28
+
+### Added
+
+- Added ground dodging for both classes on either Shift key, with camera-relative input, collision-aware travel, a 0.18-second immunity window and a 0.95-second cooldown.
+- Dodging cancels attacks before contact and spells before release. The HUD shows dodge readiness and recovery. Leaving either extraction portal during a dodge cancels its channel.
+
+### Fixed
+
+- Stop dodge travel when the run enters settlement. The AshenRift module builds translation units independently to avoid UE4 unity-build symbol collisions on Windows.
+
+### Validation
+
+- Passed all 16 regression tests on the final build. Both classes dodged each of the Warden's three moves in the generated Ruins. Tested wall collision, paused timing, attack cancellation and both extraction portals. The rendered test, standard Editor and Game builds, Blueprint compilation and the seven-map WindowsNoEditor cook passed. See the [directional dodge notes](Docs/24_Directional_Dodge.md).
+
 ## 0.17 — 2026-11-28
 
 ### Added

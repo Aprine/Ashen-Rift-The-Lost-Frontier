@@ -333,6 +333,7 @@ void UARGameWidget::BuildRoot()
     auto* ManaSize = WidgetTree->ConstructWidget<USizeBox>(); ManaSize->SetHeightOverride(5); ManaSize->AddChild(ManaBar); Stats->AddChild(ManaSize);
     Text(Stats, TEXT(""), 14, FLinearColor::White, TEXT("HudWallet"));
     Text(Stats, TEXT(""), 13, Muted, TEXT("HudSkill"));
+    Text(Stats, TEXT(""), 13, Cyan, TEXT("HudDodge"));
     PromptPanel = Panel(RootCanvas, PromptBounds.GetTopLeft(), PromptBounds.GetSize(), FLinearColor(.018f, .027f, .041f, .82f));
     auto* PromptBody = WidgetTree->ConstructWidget<UVerticalBox>(); PromptPanel->AddChild(PromptBody);
     Text(PromptBody, TEXT(""), 15, Gold, TEXT("HudNotice"));
@@ -396,7 +397,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.17 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.18 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -514,7 +515,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Text(ModalBody, TEXT("战斗、弹体与技能冷却均已冻结。"), 16, Cyan);
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT("继续游戏 [Esc]"), TEXT("Resume"));
-        Text(ModalBody, TEXT("WASD 移动 · 鼠标观察 · 空格跳跃\n左键攻击 · F 职业技能 · Q 药水\nE 交互 / 撤离 · Tab 背包 · Z/X/C 装卸\n营地 B 准备 · 1/2 选职业 · T/Y 天赋"), 17, Muted);
+        Text(ModalBody, TEXT("WASD 移动 · 鼠标观察 · 空格跳跃 · Shift 闪避\n左键攻击 · F 职业技能 · Q 药水\nE 交互 / 撤离 · Tab 背包 · Z/X/C 装卸\n营地 B 准备 · 1/2 选职业 · T/Y 天赋"), 17, Muted);
         Gap(ModalBody, 18);
         Text(ModalBody, TEXT("退出时不会保存未撤离物品，已带入装备不会退还。"), 16, Gold);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
@@ -599,6 +600,13 @@ FString UARGameWidget::LabelText(FName Key) const
     if (Key == TEXT("HudCombat")) return FString::Printf(TEXT("%s  ·  伤害加成 +%d  ·  法力 %.0f"), Mage ? TEXT("法师") : TEXT("战士"), P->TotalDamageBonus(), P->Mana);
     if (Key == TEXT("HudWallet")) return FString::Printf(TEXT("金币 %d    符文 %d    药水 %d"), S->RunGold, S->RunRunes, P->Inventory->Count(TEXT("Potion")));
     if (Key == TEXT("HudSkill")) return FString::Printf(TEXT("[F] %s  ·  %s"), Mage ? TEXT("奥术爆发") : TEXT("旋风斩"), P->SkillRemaining() > 0 ? *FString::Printf(TEXT("冷却 %.1f 秒"), P->SkillRemaining()) : TEXT("就绪"));
+    if (Key == TEXT("HudDodge") && P->CanPlay())
+    {
+        if (P->IsDodging()) return TEXT("[Shift] 闪避中");
+        const float Remaining = P->DodgeCooldownRemaining();
+        return Remaining > 0.f ? FString::Printf(TEXT("[Shift] 闪避  ·  冷却 %.1f 秒"), Remaining)
+            : FString(TEXT("[Shift] 闪避  ·  就绪"));
+    }
     if (Key == TEXT("HudNotice") || Key == TEXT("ModalNotice")) return !S->LastError.IsEmpty() ? TranslateNotice(S->LastError) : TranslateNotice(P->Notice);
     if (Key == TEXT("HudContext"))
     {

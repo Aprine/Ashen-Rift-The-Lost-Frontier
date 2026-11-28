@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and Blueprints**. Explore dungeons, collect loot, buy supplies, and choose between extracting safely or pushing deeper for greater rewards and permanent progression.
 
-**Version:** 0.17 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with class models, updated combat animations and two extraction routes in the generated Random Ruins
+**Version:** 0.18 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with directional dodging for both classes and two extraction routes in Random Ruins
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
@@ -36,6 +36,7 @@ Town preparation → Random Expedition, Random Ruins or practice dungeon → Exp
 - **Persistent progression:** shared Vitality and Might talents, item storage and camp loadout preparation.
 - **Clickable Chinese UI:** main menu, camp, inventory, trader, pause and settlement screens, with keyboard shortcuts retained.
 - **Combat feedback:** player attacks and spells resolve at set points in their animations. Raiders, Hexers, Sentinels and the Warden have distinct attacks and fall animations, supported by hit flashes, damage numbers, camera feedback and eleven synthesised sounds.
+- **Directional dodge:** either class can evade on the ground, briefly avoid damage and cancel an attack before it hits. The HUD shows dodge availability and cooldown.
 
 ![Dungeon 1 with the trader on the left and the blue extraction portal through the right doorway](Docs/Images/dungeon-1-trader-and-extraction.png)
 
@@ -84,6 +85,8 @@ Choose a class in the main menu, enter town and press **B** near the spawn to pr
 
 Switch between the Warrior and Mage in town to see each model. In a dungeon, use the left mouse button or **F** to start an attack. Taking a hit can interrupt the player before their strike or spell lands.
 
+Hold a movement direction and press **Shift** to dodge. With no movement input, the dodge follows the character's facing. Dodging out of either extraction portal interrupts the channel.
+
 In Random Ruins, take the blue portal to extract in three seconds. For a higher payout, defeat the elite to unseal the gold portal, cross the Warden's room and hold the gold portal for five seconds. The Warden can be bypassed. The route map shows whether the portal is sealed and how many bonus runes are at stake.
 
 In Dungeon 3, find the **route board**, press **E**, then press **4** to preview the modular branch. Select a room, follow the HUD to the green passage and press **E** to enter. Press **M** inside to reopen the map. Press **R** at settlement to return to town.
@@ -104,6 +107,7 @@ The play script uses your local Unreal installation. The Development game execut
 |---|---|
 | Move / look | WASD / mouse |
 | Jump | Space |
+| Directional dodge | Left or right Shift with a movement direction |
 | Basic attack / Mage projectile | Left mouse button |
 | Class skill | F |
 | Use a potion | Q |
@@ -139,7 +143,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 
 ## Validation
 
-The suite covers health, inventory, room seeds, progression, navigation, camp, UI, both playable models, animation-timed attacks, enemy moves, the three authored expeditions, the modular branch and both Random Ruins exits. See the [0.17 character and combat notes](Docs/23_Character_Combat_Integration.md) for validation results.
+The suite covers health, inventory, room seeds, progression, navigation, camp, UI, class models, animation-timed attacks, enemy moves, directional dodging, authored expeditions, the modular branch and both Random Ruins exits. See the [0.18 dodge notes](Docs/24_Directional_Dodge.md) for validation results.
 
 Run the existing suite after building the editor module:
 
@@ -179,6 +183,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 | Topic | Documentation |
 |---|---|
+| Version 0.18 directional dodge, immunity window and cooldown | [Directional dodge](Docs/24_Directional_Dodge.md) |
 | Version 0.17 character models and combat animations | [Character and combat integration](Docs/23_Character_Combat_Integration.md) |
 | Version 0.16 two extraction routes and tiered rune rewards | [Deep extraction](Docs/22_Deep_Extraction.md) |
 | Version 0.15 generated standalone expedition and optional Boss | [Random Ruins](Docs/21_Random_Ruins.md) |

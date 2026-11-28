@@ -48,6 +48,9 @@ public:
     UPROPERTY(BlueprintReadOnly) bool bShopOpen = false;
     UPROPERTY() AARShop* ActiveShop = nullptr;
     UFUNCTION(BlueprintCallable) void Attack();
+    UFUNCTION(BlueprintCallable, Category="Combat") void Dodge();
+    UFUNCTION(BlueprintPure, Category="Combat") bool IsDodging() const { return DodgeTimeRemaining > 0.f; }
+    UFUNCTION(BlueprintPure, Category="Combat") float DodgeCooldownRemaining() const;
     UFUNCTION(BlueprintCallable) void Interact();
     void ToggleBranchMap();
     UFUNCTION(BlueprintCallable) void UsePotion();
@@ -77,6 +80,9 @@ private:
     float NoticeUntil = 0.f;
     float ExtractUntil = 0.f;
     float NextSkillTime = 0.f;
+    float NextDodgeTime = 0.f;
+    float DodgeTimeRemaining = 0.f;
+    FVector DodgeDirection = FVector::ZeroVector;
     FVector ExtractLocation;
     void MoveForward(float Value);
     void MoveRight(float Value);
@@ -84,6 +90,7 @@ private:
     void LookPitch(float Value);
     void TogglePauseMenu();
     void SafeJump();
+    void UpdateDodge(float DeltaSeconds);
     void ToggleInventory();
     void OptionOne();
     void OptionTwo();

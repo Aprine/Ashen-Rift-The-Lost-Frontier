@@ -24,8 +24,11 @@ public:
     UFUNCTION(BlueprintCallable, Category="Health") void ReceiveDamage(float Amount);
     UFUNCTION(BlueprintCallable, Category="Health") float Heal(float Amount);
     UFUNCTION(BlueprintCallable, Category="Health") void ResetHealth();
+    void SetDamageImmunity(float Duration);
 protected:
     virtual void BeginPlay() override;
     UFUNCTION() void HandleAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* Type,
                                     AController* Instigator, AActor* Causer);
+private:
+    float DamageImmuneUntil = 0.f;
 };

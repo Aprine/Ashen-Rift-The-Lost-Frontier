@@ -36,6 +36,7 @@ bool AARPlayerCharacter::SelectClass(EARPlayerClass Class)
 void AARPlayerCharacter::ResetCombatForRun()
 {
     bPreviewAttack = false;
+    NextDodgeTime = DodgeTimeRemaining = 0.f;
     Feedback->ResetFeedback();
     Equipment->ClearEquipment();
     Health->MaxHealth = BaseMaxHealth();
@@ -81,7 +82,7 @@ void AARPlayerCharacter::FireSpell(bool bHeavy)
 void AARPlayerCharacter::UseSkill()
 {
     auto* State = GetRun(this);
-    if (!CanPlay() || IsUIBlockingInput() || !State || State->Phase != EARRunPhase::InDungeon || bShopOpen || SkillRemaining() > 0) return;
+    if (!CanPlay() || IsDodging() || IsUIBlockingInput() || !State || State->Phase != EARRunPhase::InDungeon || bShopOpen || SkillRemaining() > 0) return;
     if (bPreviewCharacter)
     {
         if (SelectedClass == EARPlayerClass::Mage && Mana < 30) { ShowNotice(TEXT("Not enough mana")); return; }

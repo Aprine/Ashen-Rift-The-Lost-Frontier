@@ -28,6 +28,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerInput.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
 #include "Materials/MaterialInterface.h"
@@ -37,6 +38,11 @@
 
 namespace
 {
+    constexpr float DodgeDuration = .24f;
+    constexpr float DodgeSpeed = 1500.f;
+    constexpr float DodgeImmunity = .18f;
+    constexpr float DodgeCooldown = .95f;
+
     UARRunGameInstance* Run(const UObject* Object)
     { return Cast<UARRunGameInstance>(UGameplayStatics::GetGameInstance(Object)); }
     void SetupMannequin(USkeletalMeshComponent* Mesh)
@@ -104,6 +110,7 @@ void AARPlayerCharacter::SetupPlayerInputComponent(UInputComponent* Input)
     Input->BindAction("Jump", IE_Pressed, this, &AARPlayerCharacter::SafeJump);
     Input->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
     Input->BindAction("Attack", IE_Pressed, this, &AARPlayerCharacter::Attack);
+    Input->BindAction("Dodge", IE_Pressed, this, &AARPlayerCharacter::Dodge);
     Input->BindAction("Interact", IE_Pressed, this, &AARPlayerCharacter::Interact);
     Input->BindAction("BranchMap", IE_Pressed, this, &AARPlayerCharacter::ToggleBranchMap);
     Input->BindAction("Potion", IE_Pressed, this, &AARPlayerCharacter::UsePotion);
@@ -132,24 +139,84 @@ bool AARPlayerCharacter::CanPlay() const
 void AARPlayerCharacter::MoveForward(float Value)
 {
     const auto* State = Run(this);
-    if (Controller && !IsUIBlockingInput() && !Health->bDead && State && State->Phase != EARRunPhase::Result && State->Phase != EARRunPhase::Settling)
+    if (Controller && !IsDodging() && !IsUIBlockingInput() && !Health->bDead && State && State->Phase != EARRunPhase::Result && State->Phase != EARRunPhase::Settling)
         AddMovementInput(FRotationMatrix(FRotator(0, Controller->GetControlRotation().Yaw, 0)).GetUnitAxis(EAxis::X), Value);
 }
 void AARPlayerCharacter::MoveRight(float Value)
 {
     const auto* State = Run(this);
-    if (Controller && !IsUIBlockingInput() && !Health->bDead && State && State->Phase != EARRunPhase::Result && State->Phase != EARRunPhase::Settling)
+    if (Controller && !IsDodging() && !IsUIBlockingInput() && !Health->bDead && State && State->Phase != EARRunPhase::Result && State->Phase != EARRunPhase::Settling)
         AddMovementInput(FRotationMatrix(FRotator(0, Controller->GetControlRotation().Yaw, 0)).GetUnitAxis(EAxis::Y), Value);
 }
 void AARPlayerCharacter::SafeJump()
-{ const auto* State = Run(this); if (State && !IsUIBlockingInput() && State->Phase != EARRunPhase::Result && State->Phase != EARRunPhase::Settling && !Health->bDead) Jump(); }
+{ const auto* State = Run(this); if (State && !IsDodging() && !IsUIBlockingInput() && State->Phase != EARRunPhase::Result && State->Phase != EARRunPhase::Settling && !Health->bDead) Jump(); }
+float AARPlayerCharacter::DodgeCooldownRemaining() const
+{
+    const auto* World = GetWorld();
+    return World ? FMath::Max(0.f, NextDodgeTime - World->GetTimeSeconds()) : 0.f;
+}
+
+void AARPlayerCharacter::Dodge()
+{
+    auto* Movement = GetCharacterMovement();
+    if (!CanPlay() || IsDodging() || IsUIBlockingInput() || bShopOpen || UGameplayStatics::IsGamePaused(this) ||
+        DodgeCooldownRemaining() > 0.f || !Movement->IsMovingOnGround()) return;
+
+    FVector Direction = GetPendingMovementInputVector().GetSafeNormal2D();
+    const auto* PC = Cast<APlayerController>(Controller);
+    if (PC && PC->PlayerInput)
+    {
+        // Actions run before the bound axis delegates. Read the current mapped keys for simultaneous presses.
+        const auto ReadAxis = [PC](FName Axis)
+        {
+            float Value = 0.f;
+            for (const FInputAxisKeyMapping& Mapping : PC->PlayerInput->GetKeysForAxis(Axis))
+                Value += Mapping.Scale * PC->GetInputAnalogKeyState(Mapping.Key);
+            return FMath::Clamp(Value, -1.f, 1.f);
+        };
+        const FRotationMatrix View(FRotator(0, PC->GetControlRotation().Yaw, 0));
+        const FVector MappedDirection = View.GetUnitAxis(EAxis::X) * ReadAxis(TEXT("MoveForward")) +
+            View.GetUnitAxis(EAxis::Y) * ReadAxis(TEXT("MoveRight"));
+        if (!MappedDirection.IsNearlyZero(.1f)) Direction = MappedDirection.GetSafeNormal2D();
+    }
+    DodgeDirection = Direction.IsNearlyZero() ? GetActorForwardVector().GetSafeNormal2D() : Direction;
+    DodgeTimeRemaining = DodgeDuration;
+    NextDodgeTime = GetWorld()->GetTimeSeconds() + DodgeCooldown;
+    Health->SetDamageImmunity(DodgeImmunity);
+
+    ConsumeMovementInputVector();
+    Movement->StopMovementImmediately();
+    SetActorRotation(DodgeDirection.Rotation());
+    bPreviewAttack = false;
+    if (bPreviewCharacter) PlayPreviewClip(TEXT("Running_A"), true, 0.f, .055f);
+    else Feedback->ResetFeedback();
+}
+
+void AARPlayerCharacter::UpdateDodge(float DeltaSeconds)
+{
+    if (!CanPlay())
+    {
+        DodgeTimeRemaining = 0.f;
+        Health->SetDamageImmunity(0.f);
+        return;
+    }
+    const float Step = FMath::Min(DodgeTimeRemaining, DeltaSeconds);
+    DodgeTimeRemaining -= Step;
+    auto* Movement = GetCharacterMovement();
+    if (!Movement->IsMovingOnGround()) DodgeDirection = FVector::ZeroVector;
+    if (DodgeDirection.IsNearlyZero()) return;
+    FHitResult Hit;
+    Movement->SafeMoveUpdatedComponent(DodgeDirection * (DodgeSpeed * Step), GetActorQuat(), true, Hit);
+    Movement->bForceNextFloorCheck = true;
+    if (Hit.IsValidBlockingHit()) DodgeDirection = FVector::ZeroVector;
+}
 void AARPlayerCharacter::ShowNotice(const FString& Text)
 { Notice = Text; NoticeUntil = GetWorld()->GetTimeSeconds() + 2.5f; }
 void AARPlayerCharacter::ToggleInventory() { bInventoryVisible = !bInventoryVisible; if (bInventoryVisible) bCampOpen = false; }
 void AARPlayerCharacter::Attack()
 {
     auto* State = Run(this);
-    if (!CanPlay() || IsUIBlockingInput() || bShopOpen || State->Phase != EARRunPhase::InDungeon || GetWorld()->GetTimeSeconds() < NextAttackTime) return;
+    if (!CanPlay() || IsDodging() || IsUIBlockingInput() || bShopOpen || State->Phase != EARRunPhase::InDungeon || GetWorld()->GetTimeSeconds() < NextAttackTime) return;
     if (SelectedClass == EARPlayerClass::Mage && Mana < 8) { ShowNotice(TEXT("Not enough mana")); return; }
     if (bPreviewCharacter)
     {
@@ -330,7 +397,7 @@ void AARPlayerCharacter::Interact()
         if (auto* Mode = Cast<AARPrototypeGameMode>(GetWorld()->GetAuthGameMode())) Mode->StartDungeon(this);
         return;
     }
-    if (!CanPlay() || State->Phase != EARRunPhase::InDungeon) return;
+    if (!CanPlay() || IsDodging() || State->Phase != EARRunPhase::InDungeon) return;
     for (TActorIterator<AARShop> It(GetWorld()); It; ++It)
     {
         if (It->CanTrade(this)) { ActiveShop = *It; bShopOpen = true; bInventoryVisible = false; return; }
@@ -375,7 +442,8 @@ float AARPlayerCharacter::ExtractionRemaining() const
 void AARPlayerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
-    if (bPreviewCharacter) UpdatePreviewAction();
+    if (IsDodging()) UpdateDodge(DeltaSeconds);
+    else if (bPreviewCharacter) UpdatePreviewAction();
     if (GetWorld()->GetTimeSeconds() > NoticeUntil) Notice.Empty();
     auto* State = Run(this);
     if (CanPlay() && SelectedClass == EARPlayerClass::Mage) Mana = FMath::Min(100.f, Mana + DeltaSeconds * 12.f);
@@ -389,7 +457,11 @@ void AARPlayerCharacter::Tick(float DeltaSeconds)
     }
     if (State && GetActorLocation().Z < -500)
     {
-        if (CanPlay()) Health->ReceiveDamage(Health->MaxHealth);
+        if (CanPlay())
+        {
+            Health->SetDamageImmunity(0.f);
+            Health->ReceiveDamage(Health->MaxHealth);
+        }
         else if (State->Phase == EARRunPhase::Hub)
             if (const auto* Mode = GetWorld()->GetAuthGameMode<AARPrototypeGameMode>())
                 if (Mode->IsExpeditionTown()) ResetForHub();
@@ -397,6 +469,7 @@ void AARPlayerCharacter::Tick(float DeltaSeconds)
 }
 void AARPlayerCharacter::Damaged()
 {
+    DodgeTimeRemaining = 0.f;
     if (bPreviewCharacter && !Health->bDead)
     {
         bPreviewAttack = false;
@@ -413,6 +486,7 @@ void AARPlayerCharacter::Damaged()
 }
 void AARPlayerCharacter::Died()
 {
+    DodgeTimeRemaining = 0.f;
     if (bPreviewCharacter)
     {
         bPreviewAttack = false;
