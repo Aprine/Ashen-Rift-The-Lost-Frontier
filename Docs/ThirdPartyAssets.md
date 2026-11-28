@@ -27,3 +27,8 @@ notes. This notice does not assign a license to the project's own source code.
 ## 0.11 Dungeon 3, merchant and Boss rooms
 
 - Kuangxin authored Dungeon 3, the merchant area and the Boss room. The delivery adds 32 KayKit Dungeon packages under `Content/Environments/KayKitDungeon/` under the KayKit Dungeon credit and CC0 terms above. [Dungeon 3 commit](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/15c2120635a37e7285c373b23412fa01257c7419) · [Merchant and Boss rooms commit](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/d8f8feeb7786576b4d124ea5dfbf2df646f7b2dd) · [Boss room follow-up](https://github.com/kuangxin114514/Ashen-Rift-The-Lost-Frontier/commit/fa4c9a63c40b4514480f947fb323d7dd97d2ab91)
+
+## 0.17 player and combat animation integration
+
+- The Knight and Mage, their weapons, textures and skeletal clips in `Content/AshenRift/PlayerPreview/` come from Kay Lousberg's [KayKit Adventurers pack](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0), licensed under [CC0 1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/blob/main/LICENSE.txt).
+- byimy supplied the imported player packages, runtime animation setup and ten UE4 mannequin enemy clips. [Teammate contribution](https://github.com/byimy/Ashen-Rift-The-Lost-Frontier/commit/498b93bceada451a18bcf8a31f465c30785c9003)

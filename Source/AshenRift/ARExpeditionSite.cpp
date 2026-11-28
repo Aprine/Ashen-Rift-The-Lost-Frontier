@@ -1,5 +1,6 @@
 #include "ARExpeditionSite.h"
 #include "ARBranchWing.h"
+#include "ARHealthComponent.h"
 #include "ARPrototype.h"
 #include "ARRunGameInstance.h"
 #include "Components/SceneComponent.h"
@@ -174,6 +175,12 @@ bool AARExpeditionRouteBoard::Choose(EARExpeditionRoute Route, AARPlayerCharacte
     Elite = Mode ? Mode->SpawnRouteElite(Player, ElitePosition, RewardItem) : nullptr;
     bEliteStarted = Elite.IsValid();
     return bEliteStarted;
+}
+
+bool AARExpeditionRouteBoard::HasClearedElite() const
+{
+    const auto* Enemy = Elite.Get();
+    return bEliteStarted && (!Enemy || Enemy->Health->bDead);
 }
 
 FVector AARExpeditionRouteBoard::Target(EARExpeditionRoute Route) const

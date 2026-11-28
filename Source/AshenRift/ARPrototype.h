@@ -17,6 +17,8 @@ class UAREquipmentComponent;
 class UARGameWidget;
 class UARCombatFeedbackComponent;
 class AARExpeditionSite;
+class UAnimSequence;
+enum class EARCombatAction : uint8;
 
 UCLASS()
 class ASHENRIFT_API AARPlayerCharacter : public ACharacter
@@ -86,6 +88,21 @@ private:
     void OptionOne();
     void OptionTwo();
     void FireSpell(bool bHeavy);
+    void ResolveSlash();
+    void ResolveWhirlwind();
+    bool StartPreviewAction(EARCombatAction Action, bool bSkill);
+    void UpdatePreviewAction();
+    void ConfigurePreviewCharacter();
+    void PlayPreviewClip(FName Name, bool bLoop, float Duration = 0, float BlendSeconds = .11f);
+    UPROPERTY() TMap<FName, UAnimSequence*> PreviewClips;
+    UPROPERTY() UAnimSequence* PreviewClip = nullptr;
+    FRotator PreviewAim = FRotator::ZeroRotator;
+    EARCombatAction PreviewAction{};
+    bool bPreviewCharacter = false;
+    bool bPreviewAttack = false;
+    bool bPreviewContact = false;
+    bool bPreviewSkill = false;
+    bool bPreviewWasFalling = false;
     void EquipWeapon();
     void EquipArmor();
     void EquipCharm();
@@ -124,6 +141,7 @@ protected:
     bool CanPursue(AActor* Target);
     void Pursue(AActor* Target);
     bool bHasTarget = false;
+    bool bNextRaiderChop = true;
     bool bNavigationEnabled = false;
     float NextPathAt = 0;
     int32 PathIndex = 0;

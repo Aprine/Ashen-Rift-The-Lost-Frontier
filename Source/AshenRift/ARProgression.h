@@ -56,6 +56,7 @@ protected:
 private:
     float CastEndsAt = 0;
     float NextCastAt = 0;
+    bool bNextElbow = false;
 };
 
 UCLASS()

@@ -197,4 +197,7 @@ void AAREliteEnemy::BeginPlay()
     Super::BeginPlay();
     ApplyBodyMaterial(this, TEXT("/Game/AshenRift/Materials/M_Sentinel.M_Sentinel"));
     if (auto* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/AshenRift/Materials/M_Sentinel.M_Sentinel"))) Shield->SetMaterial(0, Material);
+    const auto* Audio = UARFeedbackSubsystem::Get(this);
+    if (Audio && Audio->EnemyAnimation(EARCombatAction::Heavy))
+        Shield->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepWorldTransform, TEXT("lowerarm_l"));
 }

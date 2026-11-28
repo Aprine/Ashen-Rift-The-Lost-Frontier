@@ -59,6 +59,7 @@ public:
     bool IsClaimed() const { return bClaimed; }
 
 private:
+    bool HasLivingGuard() const;
     TWeakObjectPtr<AAREnemy> Guard;
     bool bRunes = false;
     bool bClaimed = false;

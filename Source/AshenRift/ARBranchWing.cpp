@@ -98,6 +98,12 @@ void AARBranchCache::Configure(AAREnemy* InGuard, bool bGiveRunes)
     bRunes = bGiveRunes;
 }
 
+bool AARBranchCache::HasLivingGuard() const
+{
+    const auto* Enemy = Guard.Get();
+    return Enemy && !Enemy->Health->bDead;
+}
+
 bool AARBranchCache::IsNearby(const AARPlayerCharacter* Player) const
 {
     if (!IsValid(Player) || !Player->CanPlay()) return false;
@@ -109,7 +115,7 @@ bool AARBranchCache::Claim(AARPlayerCharacter* Player)
 {
     auto* State = GetWorld()->GetGameInstance<UARRunGameInstance>();
     if (!IsNearby(Player) || !State || State->Phase != EARRunPhase::InDungeon) return false;
-    if (bClaimed || Guard.IsValid())
+    if (bClaimed || HasLivingGuard())
     {
         Player->ShowNotice(Prompt());
         return false;
@@ -127,7 +133,7 @@ bool AARBranchCache::Claim(AARPlayerCharacter* Player)
 FString AARBranchCache::Prompt() const
 {
     if (bClaimed) return TEXT("储藏箱已取空");
-    if (Guard.IsValid()) return TEXT("击败守卫后可打开储藏箱");
+    if (HasLivingGuard()) return TEXT("击败守卫后可打开储藏箱");
     return bRunes ? TEXT("领取储藏箱 · 2 枚符文") : TEXT("领取储藏箱 · 2 瓶治疗药水");
 }
 
@@ -276,7 +282,8 @@ int32 AARExpeditionBranchWing::LivingEnemies(int32 Room) const
     if (!bBuilt) return Room == Id(EARBranchRoom::Guard) ? 2 : 1;
     int32 Count = 0;
     for (const TWeakObjectPtr<AAREnemy>& Enemy : RoomEnemies[Room])
-        if (Enemy.IsValid()) ++Count;
+        if (const auto* Actor = Enemy.Get())
+            if (!Actor->Health->bDead) ++Count;
     return Count;
 }
 

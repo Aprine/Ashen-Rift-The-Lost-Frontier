@@ -16,6 +16,21 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.17 — 2026-11-28
+
+### Added
+
+- Integrated byimy's Knight and Mage models with class-specific movement, jump, attack, spell, hit and death clips. Player attacks resolve at the relevant point in the clip.
+- Added distinct attacks for the Raider, Hexer, Sentinel and Ashen Warden, including the Warden's sweep, elbow strike and ground slam. Enemy death animations play after drops become available.
+
+### Fixed
+
+- Room clearance, the guarded chest, the route board and the Boss HUD now respond to death immediately while the fall animation plays.
+
+### Validation
+
+- Passed all 15 regression tests. The player and enemy combat suites also passed with real rendering. All 36 imported Unreal packages were verified in the WindowsNoEditor cook. Development Editor and Game builds, Blueprint compilation and the seven-map cook passed. See the [integration notes and screenshots](Docs/23_Character_Combat_Integration.md).
+
 ## 0.16 — 2026-11-27
 
 ### Added

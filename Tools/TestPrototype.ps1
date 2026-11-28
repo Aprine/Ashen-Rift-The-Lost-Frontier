@@ -29,6 +29,11 @@ foreach ($suite in $suites) {
     if ($suite -in @('Integration.RandomDungeon', 'Integration.Camp', 'Integration.EnemyVariants', 'Integration.UserInterface', 'Integration.CombatFeedback', 'Integration.TeamMap')) {
         $testArgs += @($DungeonMap, '-game', '-ARTestProfile')
     }
+    # These original fixtures assert damage or mana in the same frame as the input.
+    # CombatFeedback and EnemyVariants validate the current animation-driven combat.
+    if ($suite -in @('Integration.RunLoop', 'Integration.Progression', 'Integration.RandomDungeon', 'Integration.Camp', 'Integration.UserInterface')) {
+        $testArgs += '-ARLegacyCombatTest'
+    }
     $testArgs += @('-unattended', '-nop4', '-nosplash', '-nullrhi', "-ExecCmds=Automation RunTests AshenRift.$suite", '-TestExit=Automation Test Queue Empty', "-ReportExportPath=$reportDir", '-stdout', '-FullStdOutLogOutput')
     $startedAt = Get-Date
     & $editorFile @testArgs 1> $logFile 2>&1

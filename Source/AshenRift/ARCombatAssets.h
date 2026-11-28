@@ -9,4 +9,5 @@ class ASHENRIFT_API UARCombatAssets : public UBlueprintFunctionLibrary
     GENERATED_BODY()
 public:
     UFUNCTION(BlueprintCallable, Category="AshenRift|Editor") static bool CreateCombatAnimations();
+    UFUNCTION(BlueprintCallable, Category="AshenRift|Editor") static bool CreateEnemyAnimations();
 };

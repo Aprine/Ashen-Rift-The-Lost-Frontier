@@ -35,6 +35,7 @@ bool AARPlayerCharacter::SelectClass(EARPlayerClass Class)
 }
 void AARPlayerCharacter::ResetCombatForRun()
 {
+    bPreviewAttack = false;
     Feedback->ResetFeedback();
     Equipment->ClearEquipment();
     Health->MaxHealth = BaseMaxHealth();
@@ -46,6 +47,7 @@ void AARPlayerCharacter::ResetCombatForRun()
     ActiveShop = nullptr;
     Sword->SetRelativeScale3D(SelectedClass == EARPlayerClass::Mage ? FVector(.06f, .06f, 1.1f) : FVector(.07f, .07f, .85f));
     Sword->SetRelativeRotation(FRotator::ZeroRotator);
+    ConfigurePreviewCharacter();
 }
 void AARPlayerCharacter::OptionOne()
 {
@@ -63,7 +65,7 @@ void AARPlayerCharacter::FireSpell(bool bHeavy)
 {
     const float Cost = bHeavy ? 30.f : 8.f;
     if (Mana < Cost) { ShowNotice(TEXT("Not enough mana")); return; }
-    const FRotator Aim(0, Controller ? Controller->GetControlRotation().Yaw : GetActorRotation().Yaw, 0);
+    const FRotator Aim(0, !bPreviewCharacter && Controller ? Controller->GetControlRotation().Yaw : GetActorRotation().Yaw, 0);
     SetActorRotation(Aim);
     const FTransform SpawnTransform(Aim, GetActorLocation() + Aim.Vector() * 85 + FVector(0, 0, 15));
     auto* Spell = GetWorld()->SpawnActorDeferred<AARSpell>(AARSpell::StaticClass(), SpawnTransform, this, this, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
@@ -72,7 +74,7 @@ void AARPlayerCharacter::FireSpell(bool bHeavy)
     Spell->BurstRadius = bHeavy ? 230.f : 0.f;
     Mana -= Cost;
     UGameplayStatics::FinishSpawningActor(Spell, SpawnTransform);
-    Feedback->PlayAction(EARCombatAction::Cast);
+    if (!bPreviewCharacter) Feedback->PlayAction(EARCombatAction::Cast);
     if (auto* Audio = UARFeedbackSubsystem::Get(this)) Audio->PlayCue(EARFeedbackCue::Cast, GetActorLocation());
     if (bHeavy) NextSkillTime = GetWorld()->GetTimeSeconds() + 6;
 }
@@ -80,7 +82,19 @@ void AARPlayerCharacter::UseSkill()
 {
     auto* State = GetRun(this);
     if (!CanPlay() || IsUIBlockingInput() || !State || State->Phase != EARRunPhase::InDungeon || bShopOpen || SkillRemaining() > 0) return;
+    if (bPreviewCharacter)
+    {
+        if (SelectedClass == EARPlayerClass::Mage && Mana < 30) { ShowNotice(TEXT("Not enough mana")); return; }
+        StartPreviewAction(SelectedClass == EARPlayerClass::Mage ? EARCombatAction::Cast : EARCombatAction::Whirlwind, true);
+        return;
+    }
     if (SelectedClass == EARPlayerClass::Mage) { FireSpell(true); return; }
+    ResolveWhirlwind();
+    Feedback->PlayAction(EARCombatAction::Whirlwind);
+    if (auto* Audio = UARFeedbackSubsystem::Get(this)) Audio->PlayCue(EARFeedbackCue::Swing, GetActorLocation());
+}
+void AARPlayerCharacter::ResolveWhirlwind()
+{
     NextSkillTime = GetWorld()->GetTimeSeconds() + 5;
     for (TActorIterator<AAREnemy> It(GetWorld()); It; ++It)
     {
@@ -97,8 +111,6 @@ void AARPlayerCharacter::UseSkill()
         Effect->Radius = 360; Effect->Delay = .3f; Effect->bHurtsPlayer = false;
         UGameplayStatics::FinishSpawningActor(Effect, EffectTransform);
     }
-    Feedback->PlayAction(EARCombatAction::Whirlwind);
-    if (auto* Audio = UARFeedbackSubsystem::Get(this)) Audio->PlayCue(EARFeedbackCue::Swing, GetActorLocation());
     ShowNotice(TEXT("Whirlwind!"));
 }
 
@@ -193,7 +205,9 @@ void AARBlastZone::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     const auto* State = GetRun(this);
-    if (!State || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed() || State->Phase != EARRunPhase::InDungeon)
+    const auto* Enemy = Cast<AAREnemy>(GetOwner());
+    if (!State || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed() ||
+        (Enemy && Enemy->Health->bDead) || State->Phase != EARRunPhase::InDungeon)
     { Destroy(); return; }
     if (bResolved || GetWorld()->GetTimeSeconds() < ResolveAt) return;
     bResolved = true;
@@ -250,13 +264,25 @@ void AARBoss::Tick(float DeltaSeconds)
         auto* Zone = GetWorld()->SpawnActorDeferred<AARBlastZone>(AARBlastZone::StaticClass(), Transform, this);
         if (Zone) UGameplayStatics::FinishSpawningActor(Zone, Transform);
         bCasting = true; CastEndsAt = Now + 1.2f; NextCastAt = Now + 4.5f;
-        Feedback->PlayAction(EARCombatAction::Heavy, 1.2f);
+        Feedback->PlayAction(EARCombatAction::BossArea, 1.2f);
         if (auto* Audio = UARFeedbackSubsystem::Get(this)) Audio->PlayCue(EARFeedbackCue::Charge, GetActorLocation());
         Player->ShowNotice(TEXT("WARDEN SLAM - leave the red circle!"));
     }
     else if (Offset.Size() > 210) Pursue(Player);
     else if (Now >= NextAttackAt)
-    { bWindingAttack = true; HitAt = Now + .65f; NextAttackAt = Now + 1.6f; Feedback->PlayAction(EARCombatAction::Heavy, .65f); }
+    {
+        GetCharacterMovement()->StopMovementImmediately();
+        bWindingAttack = true; HitAt = Now + .65f; NextAttackAt = Now + 1.6f;
+        const auto Action = bNextElbow ? EARCombatAction::BossElbow : EARCombatAction::BossMelee;
+        bNextElbow = !bNextElbow;
+        Feedback->PlayAction(Action, .65f);
+        if (auto* Audio = UARFeedbackSubsystem::Get(this))
+        {
+            Audio->PlayCue(EARFeedbackCue::Swing, GetActorLocation());
+            if (Audio->EnemyAnimation(Action)) Player->ShowNotice(Action == EARCombatAction::BossElbow ?
+                TEXT("WARDEN ELBOW - back out of reach!") : TEXT("WARDEN SWEEP - back out of reach!"));
+        }
+    }
 }
 void AARBoss::Died()
 {

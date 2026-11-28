@@ -1,5 +1,6 @@
 #include "ARCombatFeedback.h"
 #include "ARPrototype.h"
+#include "ARProgression.h"
 #include "ARHealthComponent.h"
 #include "ARRunGameInstance.h"
 #include "Animation/AnimInstance.h"
@@ -21,12 +22,24 @@
 #include "Sound/SoundBase.h"
 #include "Sound/SoundAttenuation.h"
 #include "HAL/PlatformTime.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "UObject/ConstructorHelpers.h"
 
 UARFeedbackSubsystem* UARFeedbackSubsystem::Get(const UObject* Context)
 {
     auto* Game = Context ? UGameplayStatics::GetGameInstance(Context) : nullptr;
     return Game ? Game->GetSubsystem<UARFeedbackSubsystem>() : nullptr;
+}
+bool UARFeedbackSubsystem::UsesUpdatedCombat()
+{
+#if WITH_DEV_AUTOMATION_TESTS
+    const TCHAR* CommandLine = FCommandLine::Get();
+    return !(FParse::Param(CommandLine, TEXT("ARTestProfile")) &&
+        FParse::Param(CommandLine, TEXT("ARLegacyCombatTest")));
+#else
+    return true;
+#endif
 }
 void UARFeedbackSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -41,12 +54,39 @@ void UARFeedbackSubsystem::Initialize(FSubsystemCollectionBase& Collection)
         const FString Name = TEXT("A_AR_") + StaticEnum<EARCombatAction>()->GetNameStringByValue(Index);
         Animations.Add(EARCombatAction(Index), LoadObject<UAnimSequence>(nullptr, *FString::Printf(TEXT("/Game/AshenRift/Animations/%s.%s"), *Name, *Name)));
     }
+    if (UsesUpdatedCombat())
+    {
+        const auto LoadEnemyClip = [this](EARCombatAction Action, const TCHAR* Name)
+        {
+            EnemyAnimations.Add(Action, LoadObject<UAnimSequence>(nullptr,
+                *FString::Printf(TEXT("/Game/AshenRift/Animations/A_AR_%s.A_AR_%s"), Name, Name)));
+        };
+        LoadEnemyClip(EARCombatAction::Slash, TEXT("RaiderSwing"));
+        LoadEnemyClip(EARCombatAction::Cast, TEXT("HexerCast"));
+        LoadEnemyClip(EARCombatAction::Heavy, TEXT("SentinelShieldJab"));
+        LoadEnemyClip(EARCombatAction::Hurt, TEXT("EnemyRecoil"));
+        LoadEnemyClip(EARCombatAction::BossMelee, TEXT("WardenSweep"));
+        LoadEnemyClip(EARCombatAction::BossArea, TEXT("WardenGroundSlam"));
+        LoadEnemyClip(EARCombatAction::RaiderChop, TEXT("RaiderChop"));
+        LoadEnemyClip(EARCombatAction::BossElbow, TEXT("WardenElbow"));
+        Fall = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/AshenRift/Animations/A_AR_EnemyStaggerFall.A_AR_EnemyStaggerFall"));
+        BossFall = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/AshenRift/Animations/A_AR_WardenKneelFall.A_AR_WardenKneelFall"));
+    }
     Attenuation = NewObject<USoundAttenuation>(this);
     Attenuation->Attenuation.bAttenuate = true;
     Attenuation->Attenuation.AttenuationShapeExtents = FVector(600);
     Attenuation->Attenuation.FalloffDistance = 1800;
 }
-void UARFeedbackSubsystem::Deinitialize() { SetSoundEnabled(false); Sounds.Empty(); Animations.Empty(); Super::Deinitialize(); }
+void UARFeedbackSubsystem::Deinitialize()
+{
+    SetSoundEnabled(false);
+    Sounds.Empty();
+    Animations.Empty();
+    EnemyAnimations.Empty();
+    Fall = nullptr;
+    BossFall = nullptr;
+    Super::Deinitialize();
+}
 void UARFeedbackSubsystem::SetSoundEnabled(bool bEnabled)
 {
     bSoundEnabled = bEnabled;
@@ -95,14 +135,30 @@ bool UARCombatFeedbackComponent::PlayAction(EARCombatAction Action, float Durati
     auto* State = Cast<UARRunGameInstance>(UGameplayStatics::GetGameInstance(this));
     auto* Audio = UARFeedbackSubsystem::Get(this);
     auto* Health = GetOwner()->FindComponentByClass<UARHealthComponent>();
-    auto* Animation = Audio ? Audio->Animation(Action) : nullptr;
+    const bool bBossAction = Action == EARCombatAction::BossMelee || Action == EARCombatAction::BossArea || Action == EARCombatAction::BossElbow;
+    const auto BaseAction = bBossAction ? EARCombatAction::Heavy : Action == EARCombatAction::RaiderChop ? EARCombatAction::Slash : Action;
+    auto* Animation = Audio ? Audio->Animation(BaseAction) : nullptr;
     if (!State || (State->Phase != EARRunPhase::InDungeon && State->Phase != EARRunPhase::Extracting) ||
         !Health || Health->bDead || !Body || !Body->GetAnimInstance() || !Animation) return false;
-    const float Rate = Duration > .01f ? Animation->SequenceLength / Duration : 1.f;
-    auto* Montage = Body->GetAnimInstance()->PlaySlotAnimationAsDynamicMontage(Animation, TEXT("DefaultSlot"), .035f, .06f, Rate);
+    const bool bMonster = GetOwner()->IsA<AAREnemy>() && !GetOwner()->IsA<AARBoss>();
+    auto* EnemyClip = Audio && (bMonster || bBossAction) ? Audio->EnemyAnimation(Action) : nullptr;
+    if (EnemyClip) Animation = EnemyClip;
+    const float ImpactFraction = EnemyClip && Action != EARCombatAction::Hurt ? .64f : 1.f;
+    const float Rate = Duration > .01f ? Animation->SequenceLength * ImpactFraction / Duration : 1.f;
+    auto* Montage = Body->GetAnimInstance()->PlaySlotAnimationAsDynamicMontage(Animation, TEXT("DefaultSlot"),
+        EnemyClip ? .085f : .035f, EnemyClip ? .115f : .06f, Rate);
     if (!Montage) return false;
     LastAction = Action;
     return true;
+}
+float UARCombatFeedbackComponent::PlayEnemyFall()
+{
+    const auto* Audio = UARFeedbackSubsystem::Get(this);
+    auto* Fall = Audio ? Audio->EnemyFall(GetOwner()->IsA<AARBoss>()) : nullptr;
+    if (Fall && Body && Body->GetAnimInstance() && Body->GetAnimInstance()->PlaySlotAnimationAsDynamicMontage(
+        Fall, TEXT("DefaultSlot"), .13f, 0.f))
+        return Fall->SequenceLength - .035f;
+    return 0.f;
 }
 void UARCombatFeedbackComponent::Damaged()
 {
@@ -112,7 +168,12 @@ void UARCombatFeedbackComponent::Damaged()
     if (auto* Audio = UARFeedbackSubsystem::Get(this)) Audio->PlayCue(bPlayer ? EARFeedbackCue::Hurt : EARFeedbackCue::Hit, GetOwner()->GetActorLocation());
     AARImpactEffect::Spawn(this, GetOwner()->GetActorLocation() + FVector(0, 0, 40), LastDamage,
         bPlayer ? FLinearColor(1, .16f, .08f) : FLinearColor(1, .72f, .15f));
-    PlayAction(EARCombatAction::Hurt);
+    const auto* Enemy = Cast<AAREnemy>(GetOwner());
+    const auto* Audio = UARFeedbackSubsystem::Get(this);
+    const auto* Boss = Cast<AARBoss>(Enemy);
+    const bool bKeepTelegraph = Enemy && (Enemy->bWindingAttack || (Boss && Boss->bCasting)) &&
+        Audio && Audio->EnemyAnimation(EARCombatAction::Hurt);
+    if (!bKeepTelegraph) PlayAction(EARCombatAction::Hurt);
     if (Body && FlashMaterial)
     {
         if (!bFlashing)

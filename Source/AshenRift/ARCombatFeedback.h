@@ -19,7 +19,7 @@ class UCameraComponent;
 UENUM(BlueprintType)
 enum class EARFeedbackCue : uint8 { Swing, Hit, Cast, Blast, Hurt, Heal, Pickup, Extract, Death, Click, Charge };
 UENUM(BlueprintType)
-enum class EARCombatAction : uint8 { Slash, Cast, Heavy, Hurt, Whirlwind };
+enum class EARCombatAction : uint8 { Slash, Cast, Heavy, Hurt, Whirlwind, BossMelee, BossArea, RaiderChop, BossElbow };
 
 UCLASS()
 class ASHENRIFT_API UARFeedbackSubsystem : public UGameInstanceSubsystem
@@ -33,10 +33,16 @@ public:
     UFUNCTION(BlueprintCallable) bool PlayCue(EARFeedbackCue Cue, FVector Location, bool bUI = false);
     USoundBase* CueAsset(EARFeedbackCue Cue) const { return Sounds.FindRef(Cue); }
     UAnimSequence* Animation(EARCombatAction Action) const { return Animations.FindRef(Action); }
+    UAnimSequence* EnemyAnimation(EARCombatAction Action) const { return EnemyAnimations.FindRef(Action); }
+    UAnimSequence* EnemyFall(bool bBoss) const { return bBoss ? BossFall : Fall; }
     static UARFeedbackSubsystem* Get(const UObject* Context);
+    static bool UsesUpdatedCombat();
 private:
     UPROPERTY() TMap<EARFeedbackCue, USoundBase*> Sounds;
     UPROPERTY() TMap<EARCombatAction, UAnimSequence*> Animations;
+    UPROPERTY() TMap<EARCombatAction, UAnimSequence*> EnemyAnimations;
+    UPROPERTY() UAnimSequence* Fall = nullptr;
+    UPROPERTY() UAnimSequence* BossFall = nullptr;
     UPROPERTY() USoundAttenuation* Attenuation = nullptr;
     TArray<TWeakObjectPtr<UAudioComponent>> Voices;
     TMap<EARFeedbackCue, double> LastCueAt;
@@ -56,6 +62,7 @@ public:
     UPROPERTY(BlueprintReadOnly) EARCombatAction LastAction = EARCombatAction::Slash;
     UFUNCTION(BlueprintCallable) bool PlayAction(EARCombatAction Action, float Duration = 0);
     UFUNCTION(BlueprintCallable) void ResetFeedback();
+    float PlayEnemyFall();
 private:
     UPROPERTY() USkeletalMeshComponent* Body = nullptr;
     UPROPERTY() UMaterialInterface* FlashMaterial = nullptr;

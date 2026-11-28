@@ -1,4 +1,4 @@
-﻿#include "ARGameWidget.h"
+#include "ARGameWidget.h"
 #include "ARPrototype.h"
 #include "ARBranchWing.h"
 #include "ARProgression.h"
@@ -396,7 +396,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.16 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.17 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -564,7 +564,7 @@ void UARGameWidget::Refresh()
     BossPanel->SetVisibility(ESlateVisibility::Collapsed);
     if (View == EARUIScreen::Game && P->CanPlay())
         for (TActorIterator<AARBoss> It(GetWorld()); It; ++It)
-            if (FVector::Dist(P->GetActorLocation(), It->GetActorLocation()) < 1800)
+            if (!It->Health->bDead && FVector::Dist(P->GetActorLocation(), It->GetActorLocation()) < 1800)
             { BossPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible); BossBar->SetPercent(It->Health->CurrentHealth / It->Health->MaxHealth); break; }
 }
 
@@ -632,7 +632,8 @@ FString UARGameWidget::LabelText(FName Key) const
         return TEXT("WASD 移动 · 鼠标观察 · 左键攻击 · 空格跳跃   /   成功撤离才会保存本局战利品");
     }
     if (Key == TEXT("HudBoss"))
-        for (TActorIterator<AARBoss> It(GetWorld()); It; ++It) return It->bCasting ? TEXT("灰烬守望者  /  重击将至，离开红圈") : TEXT("灰烬守望者");
+        for (TActorIterator<AARBoss> It(GetWorld()); It; ++It)
+            if (!It->Health->bDead) return It->bCasting ? TEXT("灰烬守望者  /  重击将至，离开红圈") : TEXT("灰烬守望者");
     if (Key == TEXT("ClassWarrior")) return Mage ? TEXT("选择战士 [1]") : TEXT("✓ 战士 [1]");
     if (Key == TEXT("ClassMage")) return Mage ? TEXT("✓ 法师 [2]") : TEXT("选择法师 [2]");
     if (Key == TEXT("ClassDescription")) return FString::Printf(TEXT("%s  ·  基础生命 %.0f"), Mage ? TEXT("法师：远程法术与奥术爆发") : TEXT("战士：近战攻击与旋风斩"), P->BaseMaxHealth());
@@ -970,6 +971,8 @@ FString UARGameWidget::TranslateNotice(const FString& Message)
         {TEXT("Whirlwind!"), TEXT("旋风斩！")},
         {TEXT("Arcane impact"), TEXT("奥术命中！")},
         {TEXT("WARDEN SLAM - leave the red circle!"), TEXT("守望者即将重击，请离开红色预警圈！")},
+        {TEXT("WARDEN SWEEP - back out of reach!"), TEXT("守望者即将横扫，请拉开距离！")},
+        {TEXT("WARDEN ELBOW - back out of reach!"), TEXT("守望者即将肘击，请拉开距离！")},
         {TEXT("Purchase complete"), TEXT("购买成功。")},
         {TEXT("Cannot buy: check gold, stock or inventory space"), TEXT("无法购买：请检查金币、商店库存和背包空间。")},
         {TEXT("Equipment updated"), TEXT("装备已更新。")},

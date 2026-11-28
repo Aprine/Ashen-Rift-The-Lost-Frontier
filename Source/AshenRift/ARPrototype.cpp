@@ -1,4 +1,4 @@
-﻿#include "ARPrototype.h"
+#include "ARPrototype.h"
 #include "ARProgression.h"
 #include "AREnemyVariants.h"
 #include "ARDungeon.h"
@@ -9,6 +9,7 @@
 #include "ARProfile.h"
 #include "ARGameWidget.h"
 #include "ARCombatFeedback.h"
+#include "ARPreviewAnimInstance.h"
 #include "ARExpeditionSite.h"
 #include "ARBranchWing.h"
 #include "Camera/CameraComponent.h"
@@ -21,6 +22,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimSequence.h"
+#include "AnimationRuntime.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -148,11 +151,21 @@ void AARPlayerCharacter::Attack()
     auto* State = Run(this);
     if (!CanPlay() || IsUIBlockingInput() || bShopOpen || State->Phase != EARRunPhase::InDungeon || GetWorld()->GetTimeSeconds() < NextAttackTime) return;
     if (SelectedClass == EARPlayerClass::Mage && Mana < 8) { ShowNotice(TEXT("Not enough mana")); return; }
+    if (bPreviewCharacter)
+    {
+        if (StartPreviewAction(SelectedClass == EARPlayerClass::Mage ? EARCombatAction::Cast : EARCombatAction::Slash, false))
+            NextAttackTime = GetWorld()->GetTimeSeconds() + FMath::Max(.1f, AttackCooldown);
+        return;
+    }
     NextAttackTime = GetWorld()->GetTimeSeconds() + FMath::Max(.1f, AttackCooldown);
     if (SelectedClass == EARPlayerClass::Mage) { FireSpell(false); return; }
     Feedback->PlayAction(EARCombatAction::Slash);
     if (auto* Audio = UARFeedbackSubsystem::Get(this)) Audio->PlayCue(EARFeedbackCue::Swing, GetActorLocation());
     if (Controller) SetActorRotation(FRotator(0, Controller->GetControlRotation().Yaw, 0));
+    ResolveSlash();
+}
+void AARPlayerCharacter::ResolveSlash()
+{
     const FVector Origin = GetActorLocation();
     for (TActorIterator<AAREnemy> It(GetWorld()); It; ++It)
     {
@@ -168,6 +181,123 @@ void AARPlayerCharacter::Attack()
             ShowNotice(TEXT("Hit!"));
         }
     }
+}
+bool AARPlayerCharacter::StartPreviewAction(EARCombatAction Action, bool bSkill)
+{
+    auto* Anim = Cast<UARPreviewAnimInstance>(GetMesh()->GetAnimInstance());
+    if (!Anim || bPreviewAttack || (PreviewClip == PreviewClips.FindRef(TEXT("Hit_A")) &&
+        Anim->IsPlaying())) return false;
+    PreviewAction = Action;
+    bPreviewSkill = bSkill;
+    bPreviewAttack = true;
+    bPreviewContact = false;
+    PreviewAim = FRotator(0, Controller ? Controller->GetControlRotation().Yaw : GetActorRotation().Yaw, 0);
+    SetActorRotation(PreviewAim);
+    if (Action == EARCombatAction::Cast) PlayPreviewClip(bSkill ? TEXT("Spellcast_Long") : TEXT("Spellcast_Shoot"), false, bSkill ? .8f : .48f, .075f);
+    else PlayPreviewClip(bSkill ? TEXT("2H_Melee_Attack_Spin") : TEXT("1H_Melee_Attack_Slice_Horizontal"), false, bSkill ? .75f : .46f, .075f);
+    Feedback->LastAction = Action;
+    if (Action != EARCombatAction::Cast)
+        if (auto* Audio = UARFeedbackSubsystem::Get(this)) Audio->PlayCue(EARFeedbackCue::Swing, GetActorLocation());
+    return true;
+}
+void AARPlayerCharacter::PlayPreviewClip(FName Name, bool bLoop, float Duration, float BlendSeconds)
+{
+    auto* Clip = PreviewClips.FindRef(Name);
+    auto* Anim = Cast<UARPreviewAnimInstance>(GetMesh()->GetAnimInstance());
+    if (!Anim || !Clip || (bLoop && PreviewClip == Clip)) return;
+    PreviewClip = Clip;
+    Anim->BlendTo(Clip, bLoop, Duration > 0 ? Clip->GetPlayLength() / Duration : 1.f, BlendSeconds);
+}
+
+void AARPlayerCharacter::ConfigurePreviewCharacter()
+{
+    if (!UARFeedbackSubsystem::UsesUpdatedCombat()) return;
+    const bool bMage = SelectedClass == EARPlayerClass::Mage;
+    const FString ClassName = bMage ? TEXT("Mage") : TEXT("Knight");
+    const FString Folder = TEXT("/Game/AshenRift/PlayerPreview/") + ClassName;
+    auto* Model = LoadObject<USkeletalMesh>(nullptr, *(Folder / ClassName));
+    if (!Model) return;
+    TMap<FName, UAnimSequence*> Clips;
+    const TCHAR* Names[] = {TEXT("Idle"), TEXT("Running_A"), TEXT("Jump_Start"), TEXT("Jump_Idle"), TEXT("Jump_Land"), TEXT("Hit_A"), TEXT("Death_A"),
+        bMage ? TEXT("Spellcast_Shoot") : TEXT("1H_Melee_Attack_Slice_Horizontal"),
+        bMage ? TEXT("Spellcast_Long") : TEXT("2H_Melee_Attack_Spin")};
+    for (const TCHAR* Name : Names)
+    {
+        auto* Clip = LoadObject<UAnimSequence>(nullptr, *(Folder / TEXT("Clips") / (ClassName + TEXT("_") + Name)));
+        if (!Clip || Clip->GetSkeleton() != Model->GetSkeleton()) return;
+        Clips.Add(FName(Name), Clip);
+    }
+    bPreviewCharacter = true;
+    PreviewClips = MoveTemp(Clips);
+    PreviewClip = nullptr;
+    bPreviewWasFalling = false;
+    if (!Cast<UARPreviewAnimInstance>(GetMesh()->GetAnimInstance()))
+        GetMesh()->SetAnimInstanceClass(nullptr);
+    GetMesh()->SetSkeletalMesh(Model, true);
+    GetMesh()->SetAnimInstanceClass(UARPreviewAnimInstance::StaticClass());
+    const FBoxSphereBounds BodyBounds = Model->GetImportedBounds();
+    const float BodyScale = 175.f / FMath::Max(BodyBounds.BoxExtent.Z * 2.f, .01f);
+    GetMesh()->SetRelativeScale3D(FVector(BodyScale));
+    GetMesh()->SetRelativeLocation(FVector(0, 0, -GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() -
+        (BodyBounds.Origin.Z - BodyBounds.BoxExtent.Z) * BodyScale));
+    const FReferenceSkeleton& Ref = Model->GetRefSkeleton();
+    const int32 Foot = Ref.FindBoneIndex(TEXT("foot_r"));
+    const int32 Toe = Ref.FindBoneIndex(TEXT("toes_r"));
+    if (Foot != INDEX_NONE && Toe != INDEX_NONE)
+    {
+        const FVector Forward = FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Toe).GetLocation() -
+            FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Foot).GetLocation();
+        GetMesh()->SetRelativeRotation(FRotator(0, -Forward.Rotation().Yaw, 0));
+    }
+    Sword->SetVisibility(false);
+    PlayPreviewClip(TEXT("Idle"), true, 0.f, 0.f);
+}
+void AARPlayerCharacter::UpdatePreviewAction()
+{
+    auto* Anim = Cast<UARPreviewAnimInstance>(GetMesh()->GetAnimInstance());
+    if (!Anim || !PreviewClip || Health->bDead) return;
+    const auto* State = Run(this);
+    const bool bFalling = GetCharacterMovement()->IsFalling();
+    const bool bFallingChanged = bFalling != bPreviewWasFalling;
+    bPreviewWasFalling = bFalling;
+    if (bPreviewAttack)
+    {
+        if (!CanPlay() || State->Phase != EARRunPhase::InDungeon)
+        {
+            bPreviewAttack = false;
+            return;
+        }
+        const float ContactFraction = PreviewAction == EARCombatAction::Cast ? .60f : .52f;
+        if (!bPreviewContact && Anim->GetCurrentTime() >= PreviewClip->GetPlayLength() * ContactFraction)
+        {
+            bPreviewContact = true;
+            SetActorRotation(PreviewAim);
+            switch (PreviewAction)
+            {
+            case EARCombatAction::Slash: ResolveSlash(); break;
+            case EARCombatAction::Cast: FireSpell(bPreviewSkill); break;
+            case EARCombatAction::Whirlwind: ResolveWhirlwind(); break;
+            default: break;
+            }
+        }
+        if (!Anim->IsPlaying()) bPreviewAttack = false;
+        return;
+    }
+    if (PreviewClip == PreviewClips.FindRef(TEXT("Hit_A")) && Anim->IsPlaying()) return;
+    if (bFalling)
+    {
+        if (bFallingChanged && GetVelocity().Z > 0.f) PlayPreviewClip(TEXT("Jump_Start"), false, .20f, .095f);
+        else if (PreviewClip != PreviewClips.FindRef(TEXT("Jump_Start")) || !Anim->IsPlaying())
+            PlayPreviewClip(TEXT("Jump_Idle"), true, 0.f, .14f);
+        return;
+    }
+    if (bFallingChanged)
+    {
+        PlayPreviewClip(TEXT("Jump_Land"), false, .22f, .095f);
+        return;
+    }
+    if (PreviewClip == PreviewClips.FindRef(TEXT("Jump_Land")) && Anim->IsPlaying()) return;
+    PlayPreviewClip(GetVelocity().SizeSquared2D() > 100 ? TEXT("Running_A") : TEXT("Idle"), true);
 }
 void AARPlayerCharacter::UsePotion()
 {
@@ -245,6 +375,7 @@ float AARPlayerCharacter::ExtractionRemaining() const
 void AARPlayerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if (bPreviewCharacter) UpdatePreviewAction();
     if (GetWorld()->GetTimeSeconds() > NoticeUntil) Notice.Empty();
     auto* State = Run(this);
     if (CanPlay() && SelectedClass == EARPlayerClass::Mage) Mana = FMath::Min(100.f, Mana + DeltaSeconds * 12.f);
@@ -266,6 +397,11 @@ void AARPlayerCharacter::Tick(float DeltaSeconds)
 }
 void AARPlayerCharacter::Damaged()
 {
+    if (bPreviewCharacter && !Health->bDead)
+    {
+        bPreviewAttack = false;
+        PlayPreviewClip(TEXT("Hit_A"), false, .24f);
+    }
     bShopOpen = false;
     ActiveShop = nullptr;
     if (const auto* PC = Cast<APlayerController>(Controller))
@@ -277,6 +413,11 @@ void AARPlayerCharacter::Damaged()
 }
 void AARPlayerCharacter::Died()
 {
+    if (bPreviewCharacter)
+    {
+        bPreviewAttack = false;
+        PlayPreviewClip(TEXT("Death_A"), false);
+    }
     bShopOpen = false;
     ActiveShop = nullptr;
     GetCharacterMovement()->StopMovementImmediately();
@@ -371,13 +512,20 @@ void AAREnemy::Tick(float DeltaSeconds)
         if (Time >= NextAttackAt)
         {
             bWindingAttack = true; HitAt = Time + FMath::Max(.1f, AttackWindup); NextAttackAt = Time + FMath::Max(.5f, AttackInterval);
-            Feedback->PlayAction(AttackWindup > .6f ? EARCombatAction::Heavy : EARCombatAction::Slash, AttackWindup);
+            auto Action = AttackWindup > .6f ? EARCombatAction::Heavy : EARCombatAction::Slash;
+            if (Action == EARCombatAction::Slash)
+            {
+                if (bNextRaiderChop) Action = EARCombatAction::RaiderChop;
+                bNextRaiderChop = !bNextRaiderChop;
+            }
+            Feedback->PlayAction(Action, AttackWindup);
             if (auto* Audio = UARFeedbackSubsystem::Get(this)) Audio->PlayCue(EARFeedbackCue::Swing, GetActorLocation());
         }
     }
 }
 void AAREnemy::Died()
 {
+    bHasTarget = bWindingAttack = false;
     SetActorEnableCollision(false);
     GetCharacterMovement()->StopMovementImmediately();
     auto* Loot = GetWorld()->SpawnActor<AARLoot>(AARLoot::StaticClass(), GetActorLocation() - FVector(0, 0, 40), FRotator::ZeroRotator);
@@ -394,7 +542,9 @@ void AAREnemy::Died()
         auto* Gear = GetWorld()->SpawnActorDeferred<AARLoot>(AARLoot::StaticClass(), Transform);
         if (Gear) { Gear->ItemID = DropItemID; Gear->Quantity = 1; UGameplayStatics::FinishSpawningActor(Gear, Transform); }
     }
-    Destroy();
+    const float FallDuration = Feedback->PlayEnemyFall();
+    if (FallDuration > 0.f) SetLifeSpan(FallDuration);
+    else Destroy();
 }
 
 AARLoot::AARLoot()

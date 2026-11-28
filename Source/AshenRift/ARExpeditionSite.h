@@ -77,7 +77,7 @@ public:
     FVector Target(EARExpeditionRoute Route) const;
     FName EliteReward() const { return RewardItem; }
     bool HasStartedElite() const { return bEliteStarted; }
-    bool HasClearedElite() const { return bEliteStarted && !Elite.IsValid(); }
+    bool HasClearedElite() const;
 
 private:
     UPROPERTY() AARPortal* RoutePortal = nullptr;

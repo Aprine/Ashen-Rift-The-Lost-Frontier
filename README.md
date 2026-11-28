@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and Blueprints**. Explore dungeons, collect loot, buy supplies, and choose between extracting safely or pushing deeper for greater rewards and permanent progression.
 
-**Version:** 0.16 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with three authored dungeons and two extraction routes in the generated Random Ruins
+**Version:** 0.17 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with class models, updated combat animations and two extraction routes in the generated Random Ruins
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
@@ -24,7 +24,7 @@ Town preparation → Random Expedition, Random Ruins or practice dungeon → Exp
 
 ## Features
 
-- **Two classes:** a melee Warrior with Whirlwind and a ranged Mage with mana-based spells and Arcane Burst.
+- **Two classes:** a melee Warrior with Whirlwind and a ranged Mage with mana-based spells and Arcane Burst. Each class has its own KayKit character model and animations for movement, jumping, combat and death.
 - **Three enemy types and one Boss:** Raiders, projectile-firing Hexers, heavy-attacking Sentinels and the Ashen Warden, with readable attack warnings and opportunities to dodge or use cover.
 - **Town and three expeditions:** Choose one of Kuangxin's hand-authored dungeons from the preparation panel. Dungeon 3 has a larger layout with separate merchant and Boss areas. Both areas can be visited within the same run, with the player's health, inventory and run currency carried through each passage.
 - **Random expeditions and difficulty tiers:** Random Expedition draws from the three authored dungeons. The run seed controls the draw, enemy arrangement and equipment drops. In Random Expedition and Random Ruins, extraction at the highest unlocked tier opens the next of three tiers, with stronger enemies and better rewards.
@@ -35,7 +35,7 @@ Town preparation → Random Expedition, Random Ruins or practice dungeon → Exp
 - **Equipment and economy:** weapon, armour and charm slots, drops, potions, limited shop stock and temporary damage upgrades.
 - **Persistent progression:** shared Vitality and Might talents, item storage and camp loadout preparation.
 - **Clickable Chinese UI:** main menu, camp, inventory, trader, pause and settlement screens, with keyboard shortcuts retained.
-- **Combat feedback:** five basic skeletal overlay animations, hit flashes, sparks, actual damage numbers, light camera feedback and eleven originally synthesised sound effects.
+- **Combat feedback:** player attacks and spells resolve at set points in their animations. Raiders, Hexers, Sentinels and the Warden have distinct attacks and fall animations, supported by hit flashes, damage numbers, camera feedback and eleven synthesised sounds.
 
 ![Dungeon 1 with the trader on the left and the blue extraction portal through the right doorway](Docs/Images/dungeon-1-trader-and-extraction.png)
 
@@ -81,6 +81,8 @@ $ueRoot = 'D:\Epic Games\UE_4.27'
 The default map is `/Game/AshenRift/Maps/Map_Hub`. Open the project in UE 4.27.2 to edit it, or use the standalone script above for cross-map gameplay. Pass `-Classic` to the play script to start `/Game/AshenRift/Maps/L_FrontierDungeon`. The earlier greybox remains available at `/Game/AshenRift/Maps/L_RandomDungeon`.
 
 Choose a class in the main menu, enter town and press **B** near the spawn to prepare. Select an unlocked difficulty tier and click **随机遗迹** (Random Ruins) to start a generated run. Press **M** to see the full layout and select a room to track on the HUD. Choose **随机出征** (Random Expedition) or press **E** to draw an authored dungeon. The three named dungeon buttons launch practice runs.
+
+Switch between the Warrior and Mage in town to see each model. In a dungeon, use the left mouse button or **F** to start an attack. Taking a hit can interrupt the player before their strike or spell lands.
 
 In Random Ruins, take the blue portal to extract in three seconds. For a higher payout, defeat the elite to unseal the gold portal, cross the Warden's room and hold the gold portal for five seconds. The Warden can be bypassed. The route map shows whether the portal is sealed and how many bonus runes are at stake.
 
@@ -137,7 +139,7 @@ In editor Play-in-Editor sessions, Esc may stop play instead of opening the paus
 
 ## Validation
 
-The suite covers health, inventory, room seeds, the run loop, progression, navigation, camp management, enemy variants, UI, combat feedback, the three authored expeditions, the modular branch and both extraction routes in Random Ruins. See the [0.16 deep extraction notes](Docs/22_Deep_Extraction.md) for validation results.
+The suite covers health, inventory, room seeds, progression, navigation, camp, UI, both playable models, animation-timed attacks, enemy moves, the three authored expeditions, the modular branch and both Random Ruins exits. See the [0.17 character and combat notes](Docs/23_Character_Combat_Integration.md) for validation results.
 
 Run the existing suite after building the editor module:
 
@@ -177,6 +179,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 | Topic | Documentation |
 |---|---|
+| Version 0.17 character models and combat animations | [Character and combat integration](Docs/23_Character_Combat_Integration.md) |
 | Version 0.16 two extraction routes and tiered rune rewards | [Deep extraction](Docs/22_Deep_Extraction.md) |
 | Version 0.15 generated standalone expedition and optional Boss | [Random Ruins](Docs/21_Random_Ruins.md) |
 | Version 0.14 guarded storeroom and live route status | [Storeroom routes](Docs/20_Storeroom_Routes.md) |
@@ -198,9 +201,9 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 ## Current limitations and next steps
 
-- The integrated environment uses KayKit assets and retains some greybox support geometry. Characters and weapons still use template or simple placeholder visuals. Some scene signs remain in English.
+- The integrated environment uses KayKit assets and retains some greybox support geometry. Enemy visuals use the Unreal mannequin rig and prototype equipment. Some scene signs remain in English.
 - Random Ruins uses a fixed set of nine room types. The seed varies their connections and orientation, with the deep exit always connected to the Boss room. Dungeon 3 also has a seven-room generated wing. The Classic dungeon shuffles combat-room layouts along its fixed route.
-- Combat animations are basic generated overlays. Damage still uses existing gameplay timing rather than animation-driven hit events.
+- Player contact uses clip progress and the existing range and line-of-sight checks. Enemy windups use gameplay timers aligned to their attack clips.
 - The stash has a fixed item list without item instances, random affixes, crafting or insurance.
 - Sound settings currently provide a session-level on/off toggle. Background music, volume sliders and final mixing remain future work.
 - Navigation can briefly pause while updating, and enemies can obstruct one another.
@@ -214,6 +217,7 @@ Developed as a **COMP 4900SEF Group 23** course project.
 
 - The starting character, movement animations and template dependencies come from Epic Games' Unreal Engine Third Person template.
 - Kuangxin contributed the town, three expedition layouts, the dedicated merchant and Boss areas and the Classic room and camp layouts. [Asset provenance and source commits](Docs/ThirdPartyAssets.md) credit the KayKit packs by Kay Lousberg and record the delivered materials.
+- byimy integrated the KayKit Warrior and Mage and contributed enemy and Boss combat animations. [Contribution and asset credits](Docs/23_Character_Combat_Integration.md)
 - The five basic combat overlay animations and eleven synthesised sound effects were generated for this project. Audio source files and the generation script are included.
 - Diablo, Path of Exile and Hades provided design inspiration.
 
