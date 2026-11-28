@@ -16,6 +16,24 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.20 — 2026-11-28
+
+### Added
+
+- Replaced the Raider, Hexer and Sentinel mannequins with KayKit Skeleton Minion, Mage and Warrior models, equipped with a bone axe, a staff and a sword with shield respectively.
+- Built a distinct Ashen Warden from the KayKit Skeleton Rogue, with a dark hood and cape, three crown points, emissive eyes and an oversized axe.
+- Imported a shared skeleton and 12 clips, covering idle, walking, role-specific attacks, hit reactions and separate enemy and Warden deaths. The Warden's close strike now uses a punch animation and matching HUD copy.
+- Added the Blender export and UE4 import scripts and documented their [source and asset workflow](Docs/26_Enemy_Appearance.md).
+
+### Documentation
+
+- Added complete in-engine screenshots of the three-enemy lineup and the Warden to the bilingual README and appearance notes.
+
+### Validation
+
+- Passed all 16 regression tests, including the four enemy models, moving shield, hit reactions, windup cancellation, fall animations, drops and extraction.
+- Built the Windows Development Editor and Game targets, compiled the project Blueprints, and cooked seven maps for WindowsNoEditor with all 22 new enemy packages.
+
 ## 0.19 — 2026-11-28
 
 ### Changed

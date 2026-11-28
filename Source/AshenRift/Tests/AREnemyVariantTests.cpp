@@ -5,13 +5,15 @@
 #include "Misc/Paths.h"
 #include "../AREnemyVariants.h"
 #include "../ARCombatFeedback.h"
+#include "../ARPreviewAnimInstance.h"
 #include "../ARProgression.h"
 #include "../ARHealthComponent.h"
 #include "../ARInventoryComponent.h"
 #include "../ARRunGameInstance.h"
 #include "../ARProfile.h"
-#include "Animation/AnimInstance.h"
-#include "Animation/AnimMontage.h"
+#include "Animation/AnimationAsset.h"
+#include "Engine/SkeletalMesh.h"
+#include "Materials/MaterialInterface.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -46,14 +48,22 @@ class FAREnemyVariantCommand : public IAutomationLatentCommand
     int32 CaptureFrames = 0;
     bool bCaptureRequested = false;
     FVector ShieldReadyPosition;
-    FVector StandingPelvis;
+    FVector StandingHips;
+    FVector BossHeadBeforeDeath;
+    bool UsesKayKitAppearance(const AAREnemy* Enemy, const FName MeshName) const
+    {
+        const auto* Mesh = Enemy->GetMesh()->SkeletalMesh;
+        const auto* Skin = Enemy->GetMesh()->GetMaterial(0);
+        const float PoseHeight = FVector::Distance(Enemy->GetMesh()->GetSocketLocation(TEXT("head")),
+            Enemy->GetMesh()->GetSocketLocation(TEXT("foot_r")));
+        return Mesh && Mesh->GetFName() == MeshName && Skin &&
+            Skin->GetPathName().StartsWith(TEXT("/Game/AshenRift/Enemies/KayKit/")) && PoseHeight > 42.f;
+    }
     bool IsPlayingClip(AAREnemy* Enemy, const TCHAR* Name)
     {
-        auto* Anim = Enemy->GetMesh()->GetAnimInstance();
-        auto* Montage = Anim ? Anim->GetCurrentActiveMontage() : nullptr;
-        if (!Montage || Montage->SlotAnimTracks.Num() == 0) return false;
-        const auto& Segments = Montage->SlotAnimTracks[0].AnimTrack.AnimSegments;
-        return Segments.Num() && Segments[0].AnimReference && Segments[0].AnimReference->GetName() == Name;
+        const auto* Anim = Cast<UARPreviewAnimInstance>(Enemy->GetMesh()->GetAnimInstance());
+        const auto* Clip = Anim ? Anim->GetAnimationAsset() : nullptr;
+        return Clip && Clip->GetFName() == FName(Name);
     }
     void Capture(const TCHAR* Name)
     {
@@ -131,9 +141,10 @@ public:
             Test->TestEqual(TEXT("Windup cannot immediately deal damage"), Player->Health->CurrentHealth, 100.f);
             if (bPreview)
             {
-                Test->TestTrue(TEXT("Hexer uses its cast animation"), IsPlayingClip(Ranged.Get(), TEXT("A_AR_HexerCast")));
+                Test->TestTrue(TEXT("Hexer uses the KayKit mage mesh"), UsesKayKitAppearance(Ranged.Get(), TEXT("SK_Hexer")));
+                Test->TestTrue(TEXT("Hexer uses its cast animation"), IsPlayingClip(Ranged.Get(), TEXT("A_Spellcast_Shoot")));
                 Ranged->Health->ReceiveDamage(1.f);
-                Test->TestTrue(TEXT("Chip damage preserves the cast telegraph"), IsPlayingClip(Ranged.Get(), TEXT("A_AR_HexerCast")));
+                Test->TestTrue(TEXT("Chip damage preserves the cast telegraph"), IsPlayingClip(Ranged.Get(), TEXT("A_Spellcast_Shoot")));
             }
             Deadline = Now + .32f;
             Stage = 12;
@@ -201,12 +212,13 @@ public:
             if (bPreview)
             {
                 Test->TestTrue(TEXT("Dead hexer plays the fall and loses collision"), Ranged.IsValid() &&
-                    !Ranged->GetActorEnableCollision() && IsPlayingClip(Ranged.Get(), TEXT("A_AR_EnemyStaggerFall")));
+                    !Ranged->GetActorEnableCollision() && IsPlayingClip(Ranged.Get(), TEXT("A_Death_C_Skeletons")));
                 Player->SetActorLocation(FVector(7000, 0, 100));
                 Raider = World->SpawnActor<AAREnemy>(AAREnemy::StaticClass(), FVector(7150, 0, 100), FRotator(0, 180, 0));
                 if (!Raider.IsValid()) { Test->AddError(TEXT("Raider failed to spawn.")); return true; }
+                Test->TestTrue(TEXT("Raider uses the KayKit minion mesh"), UsesKayKitAppearance(Raider.Get(), TEXT("SK_Raider")));
                 Raider->Health->ReceiveDamage(1.f);
-                Test->TestTrue(TEXT("Raider recoils when hit outside its attack"), IsPlayingClip(Raider.Get(), TEXT("A_AR_EnemyRecoil")));
+                Test->TestTrue(TEXT("Raider recoils when hit outside its attack"), IsPlayingClip(Raider.Get(), TEXT("A_Hit_A")));
                 Deadline = Now + 2.f; Stage = 50; return false;
             }
             Stage = 52;
@@ -220,7 +232,7 @@ public:
             return false;
         case 50:
             if (!Raider->bWindingAttack && Now < Deadline) return false;
-            Test->TestTrue(TEXT("Raider opens with an overhead chop"), Raider->bWindingAttack && IsPlayingClip(Raider.Get(), TEXT("A_AR_RaiderChop")));
+            Test->TestTrue(TEXT("Raider opens with an overhead chop"), Raider->bWindingAttack && IsPlayingClip(Raider.Get(), TEXT("A_1H_Melee_Attack_Chop")));
             Deadline = Now + .24f; Stage = 51; return false;
         case 51:
             if (Now < Deadline) return false;
@@ -233,7 +245,7 @@ public:
             Deadline = Now + 2.f; Stage = 56; return false;
         case 56:
             if (!Raider->bWindingAttack && Now < Deadline) return false;
-            Test->TestTrue(TEXT("Raider follows the chop with a different hook animation"), Raider->bWindingAttack && IsPlayingClip(Raider.Get(), TEXT("A_AR_RaiderSwing")));
+            Test->TestTrue(TEXT("Raider follows the chop with a different hook animation"), Raider->bWindingAttack && IsPlayingClip(Raider.Get(), TEXT("A_1H_Melee_Attack_Slice_Horizontal")));
             Raider->SetActorTickEnabled(false);
             Deadline = Now + .22f;
             Stage = 57; return false;
@@ -242,15 +254,15 @@ public:
             Capture(TEXT("EnemyPreview_RaiderHook.png"));
             Stage = 53; return false;
         case 53:
-            StandingPelvis = Raider->GetMesh()->GetSocketLocation(TEXT("pelvis"));
+            StandingHips = Raider->GetMesh()->GetSocketLocation(TEXT("hips"));
             Raider->GoldReward = 0; // This target only verifies motion.
             Raider->Health->ReceiveDamage(1000);
-            Test->TestTrue(TEXT("Raider switches from windup to its staged fall"), IsPlayingClip(Raider.Get(), TEXT("A_AR_EnemyStaggerFall")));
+            Test->TestTrue(TEXT("Raider switches from windup to its staged fall"), IsPlayingClip(Raider.Get(), TEXT("A_Death_C_Skeletons")));
             Test->TestEqual(TEXT("The cancelled Raider windup does not damage the player"), Player->Health->CurrentHealth, 82.f);
             Deadline = Now + .49f; Stage = 54; return false;
         case 54:
             if (Now < Deadline) return false;
-            Test->TestTrue(TEXT("Raider lowers its pelvis during the knee-buckle phase"), StandingPelvis.Z - Raider->GetMesh()->GetSocketLocation(TEXT("pelvis")).Z > 10.f);
+            Test->TestTrue(TEXT("Raider drops toward the floor during the skeleton fall"), StandingHips.Z - Raider->GetMesh()->GetSocketLocation(TEXT("hips")).Z > 10.f);
             Capture(TEXT("EnemyPreview_RaiderBuckle.png"));
             Deadline = Now + .48f; Stage = 58; return false;
         case 58:
@@ -263,17 +275,18 @@ public:
             Test->TestTrue(TEXT("Elite attack has visible windup"), Elite->bWindingAttack);
             if (bPreview)
             {
-                Test->TestTrue(TEXT("Sentinel uses the guarded straight strike"), IsPlayingClip(Elite.Get(), TEXT("A_AR_SentinelShieldJab")));
-                Test->TestTrue(TEXT("Shield is bound to the left forearm"),
-                    Elite->Shield->GetAttachParent() == Elite->GetMesh() && Elite->Shield->GetAttachSocketName() == TEXT("lowerarm_l"));
-                ShieldReadyPosition = Elite->Shield->GetComponentLocation();
+                Test->TestTrue(TEXT("Sentinel uses the guarded straight strike"), IsPlayingClip(Elite.Get(), TEXT("A_Block_Attack")));
+                Test->TestTrue(TEXT("Sentinel uses the warrior mesh with a rigged shield"),
+                    UsesKayKitAppearance(Elite.Get(), TEXT("SK_Sentinel")) && !Elite->Shield->IsVisible() &&
+                    Elite->GetMesh()->GetBoneIndex(TEXT("handslot_l")) != INDEX_NONE);
+                ShieldReadyPosition = Elite->GetMesh()->GetSocketLocation(TEXT("handslot_l"));
             }
             Deadline = Now + .55f;
             Stage = 62;
             return false;
         case 62:
             if (Now < Deadline) return false;
-            if (bPreview) Test->TestTrue(TEXT("Shield moves with the strike pose"), FVector::Dist(ShieldReadyPosition, Elite->Shield->GetComponentLocation()) > 2.f);
+            if (bPreview) Test->TestTrue(TEXT("Shield moves with the strike pose"), FVector::Dist(ShieldReadyPosition, Elite->GetMesh()->GetSocketLocation(TEXT("handslot_l"))) > 2.f);
             Capture(TEXT("M5_Sentinel.png"));
             Stage = 61;
             return false;
@@ -318,6 +331,7 @@ public:
             {
                 Boss = World->SpawnActor<AARBoss>(AARBoss::StaticClass(), FVector(7510, 0, 110), FRotator(0, 180, 0));
                 if (!Boss.IsValid()) { Test->AddError(TEXT("Boss failed to spawn.")); return true; }
+                Test->TestTrue(TEXT("Warden uses its custom KayKit mesh"), UsesKayKitAppearance(Boss.Get(), TEXT("SK_Warden")));
                 Deadline = Now + 2.f;
                 Stage = 80;
                 return false;
@@ -327,7 +341,7 @@ public:
         }
         case 80:
             if (!Boss->bCasting && Now < Deadline) return false;
-            Test->TestTrue(TEXT("The Warden's area warning plays the ground slam"), Boss->bCasting && IsPlayingClip(Boss.Get(), TEXT("A_AR_WardenGroundSlam")));
+            Test->TestTrue(TEXT("The Warden's area warning plays the ground slam"), Boss->bCasting && IsPlayingClip(Boss.Get(), TEXT("A_2H_Melee_Attack_Chop")));
             Player->SetActorLocation(Boss->GetActorLocation() - FVector(165, 0, 20));
             Deadline = Now + .67f; Stage = 81; return false;
         case 81:
@@ -336,15 +350,15 @@ public:
             Deadline = Now + 2.f; Stage = 82; return false;
         case 82:
             if (!Boss->bWindingAttack && Now < Deadline) return false;
-            Test->TestTrue(TEXT("The Warden's close attack plays a separate sweep"), Boss->bWindingAttack && IsPlayingClip(Boss.Get(), TEXT("A_AR_WardenSweep")));
+            Test->TestTrue(TEXT("The Warden's close attack plays a separate sweep"), Boss->bWindingAttack && IsPlayingClip(Boss.Get(), TEXT("A_2H_Melee_Attack_Slice")));
             Deadline = Now + .52f; Stage = 84; return false;
         case 84:
             if (Now < Deadline) return false;
             Capture(TEXT("BossPreview_Melee.png"));
             Deadline = Now + 2.4f; Stage = 85; return false;
         case 85:
-            if (!IsPlayingClip(Boss.Get(), TEXT("A_AR_WardenElbow")) && Now < Deadline) return false;
-            Test->TestTrue(TEXT("The Warden alternates into the left elbow strike"), Boss->bWindingAttack && IsPlayingClip(Boss.Get(), TEXT("A_AR_WardenElbow")));
+            if (!IsPlayingClip(Boss.Get(), TEXT("A_Unarmed_Melee_Attack_Punch_B")) && Now < Deadline) return false;
+            Test->TestTrue(TEXT("The Warden alternates into the close-range punch"), Boss->bWindingAttack && IsPlayingClip(Boss.Get(), TEXT("A_Unarmed_Melee_Attack_Punch_B")));
             Deadline = Now + .38f; Stage = 86; return false;
         case 86:
             if (Now < Deadline) return false;
@@ -357,10 +371,10 @@ public:
             if (!Zone) { Test->AddError(TEXT("Boss death cancellation zone failed to spawn.")); return true; }
             BossDeathZone = Zone;
             UGameplayStatics::FinishSpawningActor(Zone, Transform);
-            StandingPelvis = Boss->GetMesh()->GetSocketLocation(TEXT("pelvis"));
+            BossHeadBeforeDeath = Boss->GetMesh()->GetSocketLocation(TEXT("head"));
             Boss->Health->ReceiveDamage(1000.f);
-            Test->TestTrue(TEXT("Defeating the Warden plays its own kneeling fall"),
-                Boss.IsValid() && !Boss->GetActorEnableCollision() && IsPlayingClip(Boss.Get(), TEXT("A_AR_WardenKneelFall")));
+            Test->TestTrue(TEXT("Defeating the Warden plays its own collapse"),
+                Boss.IsValid() && !Boss->GetActorEnableCollision() && IsPlayingClip(Boss.Get(), TEXT("A_Death_A")));
             Test->TestTrue(TEXT("The boss-defeated flag is set immediately"), State->bBossDefeated);
             Player->SetActorLocation(Player->GetActorLocation() - FVector(145.f, 0.f, 0.f));
             Deadline = Now + .73f; Stage = 88; return false;
@@ -368,12 +382,12 @@ public:
         case 88:
             if (Now < Deadline) return false;
             Test->TestFalse(TEXT("The defeated Warden cannot leave an active blast zone"), BossDeathZone.IsValid());
-            Test->TestTrue(TEXT("The Warden kneels before it collapses"),
-                Boss.IsValid() && StandingPelvis.Z - Boss->GetMesh()->GetSocketLocation(TEXT("pelvis")).Z > 25.f);
             Capture(TEXT("BossPreview_Kneel.png"));
             Deadline = Now + .78f; Stage = 89; return false;
         case 89:
             if (Now < Deadline) return false;
+            Test->TestTrue(TEXT("The Warden's head descends as the body collapses"),
+                Boss.IsValid() && BossHeadBeforeDeath.Z - Boss->GetMesh()->GetSocketLocation(TEXT("head")).Z > 25.f);
             if (Boss.IsValid()) Capture(TEXT("BossPreview_Fall.png"));
             for (TActorIterator<AARLoot> It(World); It; ++It)
                 if ((It->ItemID == TEXT("Gold") && It->Quantity == 70) ||

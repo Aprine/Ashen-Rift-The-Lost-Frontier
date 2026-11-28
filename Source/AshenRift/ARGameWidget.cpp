@@ -397,7 +397,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.19 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.20 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -988,7 +988,7 @@ FString UARGameWidget::TranslateNotice(const FString& Message)
         {TEXT("Arcane impact"), TEXT("奥术命中！")},
         {TEXT("WARDEN SLAM - leave the red circle!"), TEXT("守望者即将重击，请离开红色预警圈！")},
         {TEXT("WARDEN SWEEP - back out of reach!"), TEXT("守望者即将横扫，请拉开距离！")},
-        {TEXT("WARDEN ELBOW - back out of reach!"), TEXT("守望者即将肘击，请拉开距离！")},
+        {TEXT("WARDEN ELBOW - back out of reach!"), TEXT("守望者即将近身重击，请拉开距离！")},
         {TEXT("Purchase complete"), TEXT("购买成功。")},
         {TEXT("Cannot buy: check gold, stock or inventory space"), TEXT("无法购买：请检查金币、商店库存和背包空间。")},
         {TEXT("Equipment updated"), TEXT("装备已更新。")},

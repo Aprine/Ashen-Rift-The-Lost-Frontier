@@ -11,6 +11,8 @@ class UAnimSequence;
 class UAnimMontage;
 class UAudioComponent;
 class USkeletalMeshComponent;
+class USkeletalMesh;
+class AAREnemy;
 class UMaterialInterface;
 class UStaticMeshComponent;
 class UTextRenderComponent;
@@ -35,12 +37,18 @@ public:
     UAnimSequence* Animation(EARCombatAction Action) const { return Animations.FindRef(Action); }
     UAnimSequence* EnemyAnimation(EARCombatAction Action) const { return EnemyAnimations.FindRef(Action); }
     UAnimSequence* EnemyFall(bool bBoss) const { return bBoss ? BossFall : Fall; }
+    USkeletalMesh* KayKitMesh(FName Name) const { return KayKitMeshes.FindRef(Name); }
+    UAnimSequence* KayKitClip(FName Name) const { return KayKitClips.FindRef(Name); }
+    bool HasKayKitClips() const { return bKayKitClipsLoaded; }
     static UARFeedbackSubsystem* Get(const UObject* Context);
     static bool UsesUpdatedCombat();
 private:
     UPROPERTY() TMap<EARFeedbackCue, USoundBase*> Sounds;
     UPROPERTY() TMap<EARCombatAction, UAnimSequence*> Animations;
     UPROPERTY() TMap<EARCombatAction, UAnimSequence*> EnemyAnimations;
+    UPROPERTY() TMap<FName, USkeletalMesh*> KayKitMeshes;
+    UPROPERTY() TMap<FName, UAnimSequence*> KayKitClips;
+    bool bKayKitClipsLoaded = false;
     UPROPERTY() UAnimSequence* Fall = nullptr;
     UPROPERTY() UAnimSequence* BossFall = nullptr;
     UPROPERTY() USoundAttenuation* Attenuation = nullptr;
@@ -63,17 +71,23 @@ public:
     UFUNCTION(BlueprintCallable) bool PlayAction(EARCombatAction Action, float Duration = 0);
     UFUNCTION(BlueprintCallable) void ResetFeedback();
     float PlayEnemyFall();
+    bool UsesKayKitEnemy() const { return KayKitIdle != nullptr; }
 private:
     UPROPERTY() USkeletalMeshComponent* Body = nullptr;
     UPROPERTY() UMaterialInterface* FlashMaterial = nullptr;
     UPROPERTY() TArray<UMaterialInterface*> RestoreMaterials;
     UPROPERTY() UCameraComponent* Camera = nullptr;
+    UPROPERTY() UAnimSequence* KayKitIdle = nullptr;
+    UPROPERTY() UAnimSequence* KayKitWalk = nullptr;
     float FlashUntil = 0, ShakeUntil = 0, PreviousHealth = 0, LastDamage = 0;
     FVector CameraRest;
     UFUNCTION() void HealthChanged(float Current, float Maximum);
     UFUNCTION() void Damaged();
     UFUNCTION() void Died();
     void RestoreFlash();
+    void ConfigureKayKitEnemy(AAREnemy* Enemy);
+    void UpdateKayKitLocomotion();
+    bool PlayKayKitClip(FName Name, float Duration, float ImpactFraction);
 };
 
 UCLASS()

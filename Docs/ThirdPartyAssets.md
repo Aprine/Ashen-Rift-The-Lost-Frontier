@@ -32,3 +32,8 @@ notes. This notice does not assign a license to the project's own source code.
 
 - The Knight and Mage, their weapons, textures and skeletal clips in `Content/AshenRift/PlayerPreview/` come from Kay Lousberg's [KayKit Adventurers pack](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0), licensed under [CC0 1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/blob/main/LICENSE.txt).
 - byimy supplied the imported player packages, runtime animation setup and ten UE4 mannequin enemy clips. [Teammate contribution](https://github.com/byimy/Ashen-Rift-The-Lost-Frontier/commit/498b93bceada451a18bcf8a31f465c30785c9003)
+
+## 0.20 skeleton enemy and Warden appearance
+
+- Kay Lousberg's [KayKit Skeletons pack](https://kaylousberg.itch.io/kaykit-skeletons) supplies the enemy bodies, weapons, atlas and shared skeletal animation. The four meshes, one skeleton, 12 clips and associated materials and texture are under `Content/AshenRift/Enemies/KayKit/`.
+- The conversion uses the [official 1.0 source commit](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0/tree/15b62b9bad122f72926c10fb14d622c73819fa54), available under [CC0 1.0](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0/blob/15b62b9bad122f72926c10fb14d622c73819fa54/LICENSE.txt). The Warden's crown geometry, dark cloth and emissive eye material were assembled for this project using the included Skeleton Rogue as the base. [Enemy appearance notes](26_Enemy_Appearance.md)

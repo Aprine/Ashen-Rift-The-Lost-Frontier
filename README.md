@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A single-player action RPG prototype built with **Unreal Engine 4.27.2, C++ and Blueprints**. Explore dungeons, collect loot, buy supplies, and choose between extracting safely or pushing deeper for greater rewards and permanent progression.
 
-**Version:** 0.19 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with tuned Random Ruins tiers and two extraction routes
+**Version:** 0.20 · **Platform:** Windows · **Interface:** Chinese · **Status:** Playable prototype with four new enemy appearances, three Random Ruins tiers and two extraction routes
 
 [Changelog](CHANGELOG.md) · [Development notes](#development-notes)
 
@@ -35,14 +35,19 @@ Town preparation → Random Expedition, Random Ruins or practice dungeon → Exp
 - **Equipment and economy:** weapon, armour and charm slots, drops, potions, limited shop stock and temporary damage upgrades.
 - **Persistent progression:** shared Vitality and Might talents, item storage and camp loadout preparation.
 - **Clickable Chinese UI:** main menu, camp, inventory, trader, pause and settlement screens, with keyboard shortcuts retained.
+- **Enemy appearances:** the KayKit Raider carries a bone axe, the Hexer carries a staff, and the Sentinel carries a sword and shield. The Ashen Warden has a dark hood, a crown, glowing eyes and a larger axe.
 - **Combat feedback:** player attacks and spells resolve at set points in their animations. Raiders, Hexers, Sentinels and the Warden have distinct attacks and fall animations, supported by hit flashes, damage numbers, camera feedback and eleven synthesised sounds.
 - **Directional dodge:** either class can evade on the ground, briefly avoid damage and cancel an attack before it hits. The HUD shows dodge availability and cooldown.
 
 ![Dungeon 1 with the trader on the left and the blue extraction portal through the right doorway](Docs/Images/dungeon-1-trader-and-extraction.png)
 
-![The player faces the Ashen Warden in a torchlit room in Dungeon 2](Docs/Images/dungeon-2-ashen-warden.png)
+*The town and Dungeon 1 screenshots are from version 0.10.*
 
-*Version 0.10 screenshots captured in UE4.27.2 at 1920 × 1080 with the HUD hidden.*
+![Raider with axe, Hexer with staff, and Sentinel with sword and shield, from left to right](Docs/Images/kaykit-enemies-020.png)
+
+![Ashen Warden in a dark hood with a crown and a large bone axe](Docs/Images/ashen-warden-020.png)
+
+*Version 0.20 enemy lineup and Ashen Warden. Captured in the Random Ruins in UE4.27.2 at 1920 × 1080 with the HUD hidden.*
 
 ## Requirements
 
@@ -185,6 +190,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 | Topic | Documentation |
 |---|---|
+| Version 0.20 enemy models, equipment and animation | [Enemy appearances](Docs/26_Enemy_Appearance.md) |
 | Version 0.19 Random Ruins difficulty and route comparison | [Random Ruins balance](Docs/25_Ruins_Balance.md) |
 | Version 0.18 directional dodge, immunity window and cooldown | [Directional dodge](Docs/24_Directional_Dodge.md) |
 | Version 0.17 character models and combat animations | [Character and combat integration](Docs/23_Character_Combat_Integration.md) |
@@ -209,7 +215,7 @@ Detailed notes are currently written in Chinese. Older entries describe historic
 
 ## Current limitations and next steps
 
-- The integrated environment uses KayKit assets and retains some greybox support geometry. Enemy visuals use the Unreal mannequin rig and prototype equipment. Some scene signs remain in English.
+- The integrated environment uses KayKit assets and retains some greybox support geometry. The four enemy appearances are shared across the three difficulty tiers. Some scene signs remain in English.
 - Random Ruins uses a fixed set of nine room types. The seed varies their connections and orientation, with the deep exit always connected to the Boss room. Dungeon 3 also has a seven-room generated wing. The Classic dungeon shuffles combat-room layouts along its fixed route.
 - Player contact uses clip progress and the existing range and line-of-sight checks. Enemy windups use gameplay timers aligned to their attack clips.
 - The stash has a fixed item list without item instances, random affixes, crafting or insurance.

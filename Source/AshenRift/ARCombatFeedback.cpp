@@ -1,11 +1,16 @@
 #include "ARCombatFeedback.h"
 #include "ARPrototype.h"
 #include "ARProgression.h"
+#include "AREnemyVariants.h"
+#include "ARPreviewAnimInstance.h"
 #include "ARHealthComponent.h"
 #include "ARRunGameInstance.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimMontage.h"
+#include "AnimationRuntime.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Components/AudioComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -71,6 +76,23 @@ void UARFeedbackSubsystem::Initialize(FSubsystemCollectionBase& Collection)
         LoadEnemyClip(EARCombatAction::BossElbow, TEXT("WardenElbow"));
         Fall = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/AshenRift/Animations/A_AR_EnemyStaggerFall.A_AR_EnemyStaggerFall"));
         BossFall = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/AshenRift/Animations/A_AR_WardenKneelFall.A_AR_WardenKneelFall"));
+        const TCHAR* MeshNames[] = {TEXT("SK_Raider"), TEXT("SK_Hexer"), TEXT("SK_Sentinel"), TEXT("SK_Warden")};
+        for (const TCHAR* Name : MeshNames)
+            KayKitMeshes.Add(Name, LoadObject<USkeletalMesh>(nullptr,
+                *FString::Printf(TEXT("/Game/AshenRift/Enemies/KayKit/%s.%s"), Name, Name)));
+        const TCHAR* ClipNames[] = {
+            TEXT("Idle_Combat"), TEXT("Walking_A"), TEXT("1H_Melee_Attack_Chop"), TEXT("1H_Melee_Attack_Slice_Horizontal"),
+            TEXT("Block_Attack"), TEXT("Spellcast_Shoot"), TEXT("Hit_A"), TEXT("Death_A"), TEXT("Death_C_Skeletons"),
+            TEXT("2H_Melee_Attack_Chop"), TEXT("2H_Melee_Attack_Slice"), TEXT("Unarmed_Melee_Attack_Punch_B")
+        };
+        bKayKitClipsLoaded = true;
+        for (const TCHAR* Name : ClipNames)
+        {
+            auto* Clip = LoadObject<UAnimSequence>(nullptr, *FString::Printf(
+                TEXT("/Game/AshenRift/Enemies/KayKit/Animations/A_%s.A_%s"), Name, Name));
+            KayKitClips.Add(Name, Clip);
+            bKayKitClipsLoaded &= IsValid(Clip);
+        }
     }
     Attenuation = NewObject<USoundAttenuation>(this);
     Attenuation->Attenuation.bAttenuate = true;
@@ -83,6 +105,9 @@ void UARFeedbackSubsystem::Deinitialize()
     Sounds.Empty();
     Animations.Empty();
     EnemyAnimations.Empty();
+    KayKitMeshes.Empty();
+    KayKitClips.Empty();
+    bKayKitClipsLoaded = false;
     Fall = nullptr;
     BossFall = nullptr;
     Super::Deinitialize();
@@ -114,9 +139,13 @@ void UARCombatFeedbackComponent::BeginPlay()
     Super::BeginPlay();
     auto* Character = Cast<ACharacter>(GetOwner());
     Body = Character ? Character->GetMesh() : nullptr;
-    if (Body) Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
     if (Body)
-        if (auto* AnimationClass = LoadClass<UAnimInstance>(nullptr, TEXT("/Game/AshenRift/Animations/ABP_ARCombat.ABP_ARCombat_C"))) Body->SetAnimInstanceClass(AnimationClass);
+    {
+        Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+        if (auto* Enemy = Cast<AAREnemy>(Character)) ConfigureKayKitEnemy(Enemy);
+        if (!UsesKayKitEnemy())
+            if (auto* AnimationClass = LoadClass<UAnimInstance>(nullptr, TEXT("/Game/AshenRift/Animations/ABP_ARCombat.ABP_ARCombat_C"))) Body->SetAnimInstanceClass(AnimationClass);
+    }
     FlashMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/AshenRift/Materials/M_ARHitFlash.M_ARHitFlash"));
     Camera = GetOwner()->FindComponentByClass<UCameraComponent>();
     if (Camera) CameraRest = Camera->GetRelativeLocation();
@@ -130,19 +159,98 @@ void UARCombatFeedbackComponent::BeginPlay()
 }
 void UARCombatFeedbackComponent::HealthChanged(float Current, float Maximum)
 { LastDamage = FMath::Max(0.f, PreviousHealth - Current); PreviousHealth = Current; }
+
+void UARCombatFeedbackComponent::ConfigureKayKitEnemy(AAREnemy* Enemy)
+{
+    const auto* Assets = UARFeedbackSubsystem::Get(this);
+    if (!Assets || !Assets->HasKayKitClips() || !Body) return;
+    FName MeshName = TEXT("SK_Raider");
+    const bool bBoss = Enemy->IsA<AARBoss>();
+    if (bBoss) MeshName = TEXT("SK_Warden");
+    else if (Enemy->IsA<AAREliteEnemy>()) MeshName = TEXT("SK_Sentinel");
+    else if (Enemy->IsA<AARRangedEnemy>()) MeshName = TEXT("SK_Hexer");
+    auto* Model = Assets->KayKitMesh(MeshName);
+    auto* Idle = Assets->KayKitClip(TEXT("Idle_Combat"));
+    auto* Walk = Assets->KayKitClip(TEXT("Walking_A"));
+    if (!Model || Idle->GetSkeleton() != Model->GetSkeleton() || Walk->GetSkeleton() != Model->GetSkeleton()) return;
+
+    Body->SetAnimInstanceClass(nullptr);
+    Body->SetSkeletalMesh(Model);
+    Body->EmptyOverrideMaterials();
+    Body->SetAnimInstanceClass(UARPreviewAnimInstance::StaticClass());
+    const FBoxSphereBounds Bounds = Model->GetImportedBounds();
+    const float Scale = (bBoss ? 208.f : 176.f) / FMath::Max(Bounds.BoxExtent.Z * 2.f, 1.f);
+    Body->SetRelativeScale3D(FVector(Scale));
+    Body->SetRelativeLocation(FVector(0, 0, -Enemy->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() -
+        (Bounds.Origin.Z - Bounds.BoxExtent.Z) * Scale));
+    const FReferenceSkeleton& Rig = Model->GetRefSkeleton();
+    const int32 Foot = Rig.FindBoneIndex(TEXT("foot_r"));
+    const int32 Toe = Rig.FindBoneIndex(TEXT("toes_r"));
+    if (Foot != INDEX_NONE && Toe != INDEX_NONE)
+    {
+        const FVector Forward = FAnimationRuntime::GetComponentSpaceTransformRefPose(Rig, Toe).GetLocation() -
+            FAnimationRuntime::GetComponentSpaceTransformRefPose(Rig, Foot).GetLocation();
+        Body->SetRelativeRotation(FRotator(0, -Forward.Rotation().Yaw, 0));
+    }
+    KayKitIdle = Idle;
+    KayKitWalk = Walk;
+    UpdateKayKitLocomotion();
+}
+
+void UARCombatFeedbackComponent::UpdateKayKitLocomotion()
+{
+    const auto* Enemy = Cast<AAREnemy>(GetOwner());
+    auto* Anim = Cast<UARPreviewAnimInstance>(Body->GetAnimInstance());
+    if (!Enemy || !Anim || Enemy->Health->bDead) return;
+    const auto* Current = Anim->GetAnimationAsset();
+    if (Current && Current != KayKitIdle && Current != KayKitWalk && Anim->IsPlaying()) return;
+    auto* Next = Enemy->GetVelocity().SizeSquared2D() > 225.f ? KayKitWalk : KayKitIdle;
+    if (Current != Next) Anim->BlendTo(Next, true, 1.f, .12f);
+}
+
+bool UARCombatFeedbackComponent::PlayKayKitClip(FName Name, float Duration, float ImpactFraction)
+{
+    const auto* Assets = UARFeedbackSubsystem::Get(this);
+    auto* Anim = Cast<UARPreviewAnimInstance>(Body->GetAnimInstance());
+    auto* Clip = Assets ? Assets->KayKitClip(Name) : nullptr;
+    if (!Anim || !Clip) return false;
+    const float Rate = Duration > .01f ? Clip->GetPlayLength() * ImpactFraction / Duration : 1.f;
+    Anim->BlendTo(Clip, false, Rate, .075f);
+    return true;
+}
+
 bool UARCombatFeedbackComponent::PlayAction(EARCombatAction Action, float Duration)
 {
     auto* State = Cast<UARRunGameInstance>(UGameplayStatics::GetGameInstance(this));
     auto* Audio = UARFeedbackSubsystem::Get(this);
     auto* Health = GetOwner()->FindComponentByClass<UARHealthComponent>();
-    const bool bBossAction = Action == EARCombatAction::BossMelee || Action == EARCombatAction::BossArea || Action == EARCombatAction::BossElbow;
-    const auto BaseAction = bBossAction ? EARCombatAction::Heavy : Action == EARCombatAction::RaiderChop ? EARCombatAction::Slash : Action;
-    auto* Animation = Audio ? Audio->Animation(BaseAction) : nullptr;
     if (!State || (State->Phase != EARRunPhase::InDungeon && State->Phase != EARRunPhase::Extracting) ||
-        !Health || Health->bDead || !Body || !Body->GetAnimInstance() || !Animation) return false;
+        !Health || Health->bDead || !Body || !Body->GetAnimInstance()) return false;
+    if (UsesKayKitEnemy())
+    {
+        FName Clip;
+        switch (Action)
+        {
+        case EARCombatAction::Slash: Clip = TEXT("1H_Melee_Attack_Slice_Horizontal"); break;
+        case EARCombatAction::RaiderChop: Clip = TEXT("1H_Melee_Attack_Chop"); break;
+        case EARCombatAction::Cast: Clip = TEXT("Spellcast_Shoot"); break;
+        case EARCombatAction::Heavy: Clip = TEXT("Block_Attack"); break;
+        case EARCombatAction::Hurt: Clip = TEXT("Hit_A"); break;
+        case EARCombatAction::BossMelee: Clip = TEXT("2H_Melee_Attack_Slice"); break;
+        case EARCombatAction::BossArea: Clip = TEXT("2H_Melee_Attack_Chop"); break;
+        case EARCombatAction::BossElbow: Clip = TEXT("Unarmed_Melee_Attack_Punch_B"); break;
+        default: return false;
+        }
+        if (!PlayKayKitClip(Clip, Duration, .64f)) return false;
+        LastAction = Action;
+        return true;
+    }
+    const bool bBossAction = Action == EARCombatAction::BossMelee || Action == EARCombatAction::BossArea || Action == EARCombatAction::BossElbow;
     const bool bMonster = GetOwner()->IsA<AAREnemy>() && !GetOwner()->IsA<AARBoss>();
+    const auto BaseAction = bBossAction ? EARCombatAction::Heavy : Action == EARCombatAction::RaiderChop ? EARCombatAction::Slash : Action;
     auto* EnemyClip = Audio && (bMonster || bBossAction) ? Audio->EnemyAnimation(Action) : nullptr;
-    if (EnemyClip) Animation = EnemyClip;
+    auto* Animation = EnemyClip ? EnemyClip : Audio ? Audio->Animation(BaseAction) : nullptr;
+    if (!Animation) return false;
     const float ImpactFraction = EnemyClip && Action != EARCombatAction::Hurt ? .64f : 1.f;
     const float Rate = Duration > .01f ? Animation->SequenceLength * ImpactFraction / Duration : 1.f;
     auto* Montage = Body->GetAnimInstance()->PlaySlotAnimationAsDynamicMontage(Animation, TEXT("DefaultSlot"),
@@ -153,6 +261,12 @@ bool UARCombatFeedbackComponent::PlayAction(EARCombatAction Action, float Durati
 }
 float UARCombatFeedbackComponent::PlayEnemyFall()
 {
+    if (UsesKayKitEnemy())
+    {
+        const bool bBoss = GetOwner()->IsA<AARBoss>();
+        const float Duration = bBoss ? 1.85f : 1.25f;
+        return PlayKayKitClip(bBoss ? TEXT("Death_A") : TEXT("Death_C_Skeletons"), Duration, 1.f) ? Duration : 0.f;
+    }
     const auto* Audio = UARFeedbackSubsystem::Get(this);
     auto* Fall = Audio ? Audio->EnemyFall(GetOwner()->IsA<AARBoss>()) : nullptr;
     if (Fall && Body && Body->GetAnimInstance() && Body->GetAnimInstance()->PlaySlotAnimationAsDynamicMontage(
@@ -172,7 +286,7 @@ void UARCombatFeedbackComponent::Damaged()
     const auto* Audio = UARFeedbackSubsystem::Get(this);
     const auto* Boss = Cast<AARBoss>(Enemy);
     const bool bKeepTelegraph = Enemy && (Enemy->bWindingAttack || (Boss && Boss->bCasting)) &&
-        Audio && Audio->EnemyAnimation(EARCombatAction::Hurt);
+        (UsesKayKitEnemy() || (Audio && Audio->EnemyAnimation(EARCombatAction::Hurt)));
     if (!bKeepTelegraph) PlayAction(EARCombatAction::Hurt);
     if (Body && FlashMaterial)
     {
@@ -204,6 +318,7 @@ void UARCombatFeedbackComponent::TickComponent(float DeltaSeconds, ELevelTick Ti
     Super::TickComponent(DeltaSeconds, TickType, Function);
     const float Now = GetWorld()->GetTimeSeconds();
     if (bFlashing && Now >= FlashUntil) RestoreFlash();
+    if (UsesKayKitEnemy()) UpdateKayKitLocomotion();
     if (Camera)
     {
         const float Weight = FMath::Clamp((ShakeUntil - Now) / .16f, 0.f, 1.f);

@@ -107,8 +107,12 @@ AARRangedEnemy::AARRangedEnemy()
 void AARRangedEnemy::BeginPlay()
 {
     Super::BeginPlay();
-    ApplyBodyMaterial(this, TEXT("/Game/AshenRift/Materials/M_Hexer.M_Hexer"));
-    if (auto* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/AshenRift/Materials/M_Arcane.M_Arcane"))) Staff->SetMaterial(0, Material);
+    if (Feedback->UsesKayKitEnemy()) Staff->SetVisibility(false);
+    else
+    {
+        ApplyBodyMaterial(this, TEXT("/Game/AshenRift/Materials/M_Hexer.M_Hexer"));
+        if (auto* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/AshenRift/Materials/M_Arcane.M_Arcane"))) Staff->SetMaterial(0, Material);
+    }
     if (auto* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/AshenRift/Materials/M_Threat.M_Threat"))) AimLine->SetMaterial(0, Material);
 }
 void AARRangedEnemy::UpdateAimLine()
@@ -195,6 +199,11 @@ AAREliteEnemy::AAREliteEnemy()
 void AAREliteEnemy::BeginPlay()
 {
     Super::BeginPlay();
+    if (Feedback->UsesKayKitEnemy())
+    {
+        Shield->SetVisibility(false);
+        return;
+    }
     ApplyBodyMaterial(this, TEXT("/Game/AshenRift/Materials/M_Sentinel.M_Sentinel"));
     if (auto* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/AshenRift/Materials/M_Sentinel.M_Sentinel"))) Shield->SetMaterial(0, Material);
     const auto* Audio = UARFeedbackSubsystem::Get(this);
