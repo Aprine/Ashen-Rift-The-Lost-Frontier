@@ -27,6 +27,10 @@ Version entries describe the implemented prototype and its recorded validation. 
 
 - Room clearance, the guarded chest, the route board and the Boss HUD now respond to death immediately while the fall animation plays.
 
+### Documentation
+
+- Replaced both combat screenshots with 1920 × 1080 UE4 gameplay captures that show the full Warrior and Mage, their weapons, and the hit or spell in frame.
+
 ### Validation
 
 - Passed all 15 regression tests. The player and enemy combat suites also passed with real rendering. All 36 imported Unreal packages were verified in the WindowsNoEditor cook. Development Editor and Game builds, Blueprint compilation and the seven-map cook passed. See the [integration notes and screenshots](Docs/23_Character_Combat_Integration.md).
