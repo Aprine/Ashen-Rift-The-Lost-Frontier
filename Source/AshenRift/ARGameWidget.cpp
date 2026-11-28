@@ -397,7 +397,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
         Gap(ModalBody, 16);
         Button(ModalBody, TEXT(""), TEXT("Sound"), 0, TEXT("SoundLabel"));
         Button(ModalBody, TEXT("退出游戏"), TEXT("Quit"));
-        Text(ModalBody, TEXT("0.18 课程原型  /  单人地牢探索与撤离"), 13, Muted);
+        Text(ModalBody, TEXT("0.19 课程原型  /  单人地牢探索与撤离"), 13, Muted);
     }
     else if (Screen == EARUIScreen::Camp)
     {
@@ -442,6 +442,7 @@ void UARGameWidget::BuildScreen(EARUIScreen Screen)
             Button(Footer, TEXT("前往地牢三"), TEXT("DeployThird"));
             Gap(ModalBody, 8);
             Text(ModalBody, TEXT(""), 16, Cyan, TEXT("ExpeditionDifficulty"));
+            Text(ModalBody, TEXT(""), 15, Cyan, TEXT("RuinsDifficulty"));
             auto* Tiers = WidgetTree->ConstructWidget<UHorizontalBox>();
             ModalBody->AddChild(Tiers);
             const FName TierKeys[] = { TEXT("Tier1"), TEXT("Tier2"), TEXT("Tier3") };
@@ -651,6 +652,13 @@ FString UARGameWidget::LabelText(FName Key) const
         const int32 Tier = S->SelectedExpeditionTier();
         return FString::Printf(TEXT("随机出征 %d 档 · 精英 %d 名 · 敌方生命 +%d%% · 金币 +%d%% · 装备掉率 %d%%"),
             Tier, Tier - 1, 20 * (Tier - 1), ARExpedition::GoldPercent(Tier) - 100, ARExpedition::EquipmentChance(Tier));
+    }
+    if (Key == TEXT("RuinsDifficulty"))
+    {
+        const int32 Tier = S->SelectedExpeditionTier();
+        return FString::Printf(TEXT("随机遗迹 %d 档 · 敌方生命 +%d%% · 伤害 +%d%% · 金币 +%d%% · 金阵额外 %d 符文"),
+            Tier, ARExpedition::RuinsHealthBonusPercent(Tier), ARExpedition::RuinsDamageBonusPercent(Tier),
+            ARExpedition::GoldPercent(Tier) - 100, ARExpedition::DeepExtractionBonusRunes(Tier));
     }
     if (Key == TEXT("Tier1") || Key == TEXT("Tier2") || Key == TEXT("Tier3"))
     {

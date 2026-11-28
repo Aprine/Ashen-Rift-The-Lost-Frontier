@@ -14,6 +14,7 @@
 #include "NavigationSystem.h"
 #include "UnrealClient.h"
 #include "../ARBranchWing.h"
+#include "../AREnemyVariants.h"
 #include "../ARExpeditionSite.h"
 #include "../ARGameWidget.h"
 #include "../ARHealthComponent.h"
@@ -129,11 +130,14 @@ public:
         {
             if (!bInRuins) return false;
             int32 Modules = 0, Portals = 0, Bosses = 0;
+            const AARRangedEnemy* EntranceHexer = nullptr;
             for (TActorIterator<AActor> It(World); It; ++It)
             {
                 if (It->ActorHasTag(TEXT("BranchModule"))) ++Modules;
                 if (Cast<AARPortal>(*It)) ++Portals;
                 if (Cast<AARBoss>(*It)) ++Bosses;
+                if (const auto* Hexer = Cast<AARRangedEnemy>(*It))
+                    if (Wing->RoomAt(Hexer->GetActorLocation()) == Room(EARBranchRoom::Guard)) EntranceHexer = Hexer;
             }
             if (!Test.TestTrue(TEXT("Independent map starts in a generated entry room with one boss and two exits"),
                 Modules == Room(EARBranchRoom::Count) && Portals == 2 && Bosses == 1 &&
@@ -142,6 +146,8 @@ public:
                 Wing->LivingEnemies(Room(EARBranchRoom::Boss)) == 1 && State->Seed == Seed &&
                 State->ExpeditionTier == 1 && Player->Inventory->Count(TEXT("IronSword")) == 1 &&
                 State->Profile->Stash.FindRef(TEXT("IronSword")) == 0)) return true;
+            if (!Test.TestTrue(TEXT("Only the entrance Hexer funds early progression with one rune"),
+                EntranceHexer && EntranceHexer->RuneReward == 1)) return true;
             if (!CheckNavigation(World, Player, Wing)) return true;
             const FVector Entry = Player->GetActorLocation();
             Player->SetActorLocation(Deep->GetActorLocation() + Stand);
@@ -210,6 +216,10 @@ public:
         case 5:
             if (!Mode->IsExpeditionTown()) return false;
             Player->ToggleCamp(); UI->Refresh();
+            if (!Test.TestTrue(TEXT("The town previews the actual tier-two Ruins stats and portal reward"),
+                UI->LabelText(TEXT("RuinsDifficulty")).Contains(TEXT("生命 +15%")) &&
+                UI->LabelText(TEXT("RuinsDifficulty")).Contains(TEXT("伤害 +8%")) &&
+                UI->LabelText(TEXT("RuinsDifficulty")).Contains(TEXT("额外 3")))) return true;
             if (!Test.TestTrue(TEXT("The next Ruins departure defaults to the newly unlocked tier"),
                 State->SelectedExpeditionTier() == 2 && UI->ExecuteAction(TEXT("DeployRuins")))) return true;
             Stage = 6;
@@ -222,7 +232,8 @@ public:
             if (!Test.TestTrue(TEXT("Boss is in the end room and inherits tier two scaling"),
                 Boss && Wing->RoomAt(Boss->GetActorLocation()) == Room(EARBranchRoom::Boss) &&
                 Boss->DropItemID == Wing->BossReward() && State->ExpeditionTier == 2 && Deep->BonusRunes() == 3 &&
-                FMath::IsNearlyEqual(Boss->Health->MaxHealth, Boss->GetClass()->GetDefaultObject<AARBoss>()->Health->MaxHealth * 1.2f))) return true;
+                FMath::IsNearlyEqual(Boss->Health->MaxHealth, Boss->GetClass()->GetDefaultObject<AARBoss>()->Health->MaxHealth * 1.15f) &&
+                FMath::IsNearlyEqual(Boss->Damage, Boss->GetClass()->GetDefaultObject<AARBoss>()->Damage * 1.08f))) return true;
             const FVector RescueStart = Wing->Center(Room(EARBranchRoom::Boss)) + Stand;
             Boss->Health->ReceiveDamage(5000);
             if (!Test.TestTrue(TEXT("The real boss death records the victory and clears the map threat"),

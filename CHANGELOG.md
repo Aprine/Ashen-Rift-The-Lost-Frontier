@@ -16,6 +16,18 @@ Version entries describe the implemented prototype and its recorded validation. 
 - Added the canonical GitHub repository link and clone instructions for `Aprine/Ashen-Rift-The-Lost-Frontier`.
 - Excluded generated build output, caches, player saves, installers, backups and local environment files from repository uploads.
 
+## 0.19 — 2026-11-28
+
+### Changed
+
+- Random Ruins now scales enemy health by +0% / +15% / +30% and damage by +0% / +8% / +16% across tiers one to three. The town preparation panel previews Ruins scaling and the gold portal reward separately.
+- The entrance Hexer drops a rune that can be banked via either portal. Gold extraction adds another 2 / 3 / 4 runes by tier.
+
+### Validation
+
+- Ran 12 paired route cases before and after tuning on seed 9 and four additional tier-three cases on seed 28. All 28 runs extracted successfully. The [balance notes](Docs/25_Ruins_Balance.md) record time, health loss, potions, and banked gold, runes and gear.
+- Passed all 16 regression tests, the rendered Random Ruins test, Development Editor and Game builds, Blueprint compilation and the seven-map WindowsNoEditor cook.
+
 ## 0.18 — 2026-11-28
 
 ### Added

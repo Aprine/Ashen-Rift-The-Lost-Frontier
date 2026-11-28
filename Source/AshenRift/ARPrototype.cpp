@@ -677,7 +677,7 @@ AARPortal::AARPortal()
 void AARPortal::ConfigureDeep(UARHealthComponent* EliteHealth, int32 Tier)
 {
     check(IsValid(EliteHealth));
-    RunicBonus = 1 + FMath::Clamp(Tier, 1, UARRunGameInstance::MaxExpeditionTier);
+    RunicBonus = ARExpedition::DeepExtractionBonusRunes(Tier);
     bSealed = !EliteHealth->bDead;
     if (bSealed) EliteHealth->OnDied.AddUniqueDynamic(this, &AARPortal::Unseal);
 }
@@ -735,8 +735,11 @@ AAREnemy* AARPrototypeGameMode::SpawnExpeditionEnemy(TSubclassOf<AAREnemy> Class
     UGameplayStatics::FinishSpawningActor(Enemy, Transform);
     if (Tier > 1)
     {
-        Enemy->Damage *= 1.f + .1f * (Tier - 1);
-        Enemy->Health->MaxHealth *= 1.f + .2f * (Tier - 1);
+        const bool bRuins = ExpeditionSite && IsValid(ExpeditionSite->StandaloneWing);
+        const int32 DamagePercent = bRuins ? ARExpedition::RuinsDamageBonusPercent(Tier) : 10 * (Tier - 1);
+        const int32 HealthPercent = bRuins ? ARExpedition::RuinsHealthBonusPercent(Tier) : 20 * (Tier - 1);
+        Enemy->Damage *= 1.f + DamagePercent / 100.f;
+        Enemy->Health->MaxHealth *= 1.f + HealthPercent / 100.f;
         Enemy->Health->ResetHealth();
         Enemy->GoldReward = FMath::RoundToInt(Enemy->GoldReward * ARExpedition::GoldPercent(Tier) / 100.f);
     }

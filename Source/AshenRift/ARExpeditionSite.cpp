@@ -31,6 +31,21 @@ namespace
     };
 }
 
+int32 ARExpedition::RuinsHealthBonusPercent(int32 Tier)
+{
+    return 15 * (FMath::Clamp(Tier, 1, UARRunGameInstance::MaxExpeditionTier) - 1);
+}
+
+int32 ARExpedition::RuinsDamageBonusPercent(int32 Tier)
+{
+    return 8 * (FMath::Clamp(Tier, 1, UARRunGameInstance::MaxExpeditionTier) - 1);
+}
+
+int32 ARExpedition::DeepExtractionBonusRunes(int32 Tier)
+{
+    return 1 + FMath::Clamp(Tier, 1, UARRunGameInstance::MaxExpeditionTier);
+}
+
 int32 ARExpedition::GoldPercent(int32 Tier)
 {
     return 100 + 30 * FMath::Max(0, Tier - 1);

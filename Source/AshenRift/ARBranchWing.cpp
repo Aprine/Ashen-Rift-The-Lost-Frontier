@@ -443,6 +443,7 @@ bool AARExpeditionBranchWing::Build(AARPlayerCharacter* Player, int32 Tier)
     if (Boss) RoomEnemies[Id(EARBranchRoom::Boss)].Add(Boss);
     if (DeepExit)
     {
+        ++Hexer->RuneReward;
         DeepExit->ConfigureDeep(Elite->Health, Tier);
         DeepExit->Mesh->SetMaterial(0, DeepPortalMaterial);
         RoomEnemies[Id(EARBranchRoom::DeepExit)].Add(DeepGuard);

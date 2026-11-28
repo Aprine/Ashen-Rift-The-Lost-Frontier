@@ -15,6 +15,9 @@ enum class EARExpeditionEnemy : uint8 { Melee, Ranged, Elite };
 
 namespace ARExpedition
 {
+    int32 RuinsHealthBonusPercent(int32 Tier);
+    int32 RuinsDamageBonusPercent(int32 Tier);
+    int32 DeepExtractionBonusRunes(int32 Tier);
     int32 GoldPercent(int32 Tier);
     int32 EquipmentChance(int32 Tier);
     int32 ChooseDungeon(int32 Seed, int32 MapCount);
